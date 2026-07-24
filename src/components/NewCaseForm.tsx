@@ -59,7 +59,7 @@ export function NewCaseForm({ showEmptyState }: { showEmptyState: boolean }) {
         <div className="mt-5 flex gap-2.5">
           <button
             onClick={handleCreate}
-            className="bg-chop-red text-white border-none py-3 px-5.5 rounded-lg font-bold cursor-pointer text-[15px] hover:bg-chop-red-dark"
+            className="bg-chop-red text-white border-none py-3 px-5.5 rounded-lg font-bold cursor-pointer text-[15px] hover:bg-chop-red-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-gold"
           >
             建立並依規則自動排程
           </button>

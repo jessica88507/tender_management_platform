@@ -75,7 +75,7 @@ function TaskRow({ caseId, t, c, index }: { caseId: string; t: Task; c: Case; in
         onChange={(e) => patchTask({ due: e.target.value })}
         className="font-mono text-[13px] font-semibold border border-transparent bg-transparent text-ink-soft py-1 px-1 rounded w-[126px] shrink-0 focus:border-line-grey focus:bg-paper-light focus:outline-none"
       />
-      <button title="刪除" onClick={removeTask} className="text-line-grey hover:text-danger cursor-pointer shrink-0 py-0.5 px-1.5">
+      <button title="刪除" onClick={removeTask} className="text-line-grey hover:text-danger cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-danger shrink-0 py-0.5 px-1.5">
         <Trash size={15} />
       </button>
     </div>

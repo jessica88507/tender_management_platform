@@ -11,7 +11,7 @@ const inputClass =
   "w-full py-1.5 px-2 border border-line-grey rounded text-[12.5px] bg-white focus:outline-none focus:border-tab-brown";
 const labelClass = "block text-[11.5px] text-ink-soft font-mono mb-1 tracking-wide";
 const btnMiniClass =
-  "inline-flex items-center gap-1.5 bg-transparent border-[1.5px] border-tab-brown text-tab-brown py-2 px-3.5 rounded-md text-[13px] font-bold cursor-pointer hover:bg-tab-brown/10";
+  "inline-flex items-center gap-1.5 bg-transparent border-[1.5px] border-tab-brown text-tab-brown py-2 px-3.5 rounded-md text-[13px] font-bold cursor-pointer hover:bg-tab-brown/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-chop-red";
 
 export function InfoPanel({ caseId, c, totalDays }: { caseId: string; c: Case; totalDays: number }) {
   const { ui, setInfoOpen, setInfoEditing, updateCase } = useApp();

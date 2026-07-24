@@ -63,7 +63,7 @@ export function ProjectManagerModal({ onClose }: { onClose: () => void }) {
                           setActiveId(id);
                           onClose();
                         }}
-                        className="bg-transparent border border-tab-brown text-tab-brown rounded-md py-1 px-2.5 text-[11.5px] cursor-pointer hover:bg-tab-brown/10"
+                        className="bg-transparent border border-tab-brown text-tab-brown rounded-md py-1 px-2.5 text-[11.5px] cursor-pointer hover:bg-tab-brown/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-chop-red"
                       >
                         開啟
                       </button>
@@ -71,7 +71,7 @@ export function ProjectManagerModal({ onClose }: { onClose: () => void }) {
                     <td className="border-b border-dashed border-line-grey py-2 px-2">
                       <button
                         onClick={() => handleDelete(id)}
-                        className="bg-transparent border border-danger text-danger rounded-md py-1 px-2.5 text-[11.5px] cursor-pointer hover:bg-danger hover:text-white"
+                        className="bg-transparent border border-danger text-danger rounded-md py-1 px-2.5 text-[11.5px] cursor-pointer hover:bg-danger hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger"
                       >
                         刪除
                       </button>
@@ -85,7 +85,7 @@ export function ProjectManagerModal({ onClose }: { onClose: () => void }) {
         <div className="flex justify-end mt-4">
           <button
             onClick={onClose}
-            className="bg-transparent border-[1.5px] border-tab-brown text-tab-brown py-2 px-3.5 rounded-md text-[13px] font-bold cursor-pointer hover:bg-tab-brown/10"
+            className="bg-transparent border-[1.5px] border-tab-brown text-tab-brown py-2 px-3.5 rounded-md text-[13px] font-bold cursor-pointer hover:bg-tab-brown/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-chop-red"
           >
             關閉
           </button>

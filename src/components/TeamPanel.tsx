@@ -16,7 +16,7 @@ const TEAM_ICONS: Record<Exclude<TeamGroup, null>, typeof Bank> = {
 };
 
 const btnMiniClass =
-  "inline-flex items-center gap-1.5 bg-transparent border-[1.5px] border-tab-brown text-tab-brown py-2 px-3.5 rounded-md text-[13px] font-bold cursor-pointer hover:bg-tab-brown/10";
+  "inline-flex items-center gap-1.5 bg-transparent border-[1.5px] border-tab-brown text-tab-brown py-2 px-3.5 rounded-md text-[13px] font-bold cursor-pointer hover:bg-tab-brown/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-chop-red";
 
 function OrgBranch({
   title,
@@ -124,7 +124,7 @@ function TeamBox({
               onChange={(e) => setName(idx, e.target.value)}
               className="flex-1 py-1.5 px-2 border border-line-grey rounded-md text-[12.5px] bg-white"
             />
-            <button title="刪除" onClick={() => removeName(idx)} className="text-line-grey hover:text-danger cursor-pointer">
+            <button title="刪除" onClick={() => removeName(idx)} className="text-line-grey hover:text-danger cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-danger">
               <X size={15} />
             </button>
           </div>
@@ -148,7 +148,7 @@ function TeamBox({
           >
             <span className="font-bold text-ink">{row.role}</span>
             <span className="text-ink-soft font-mono">{row.contact || row.company || "未填"}</span>
-            <button title="移出" onClick={() => onDropConsultant(row.id, null)} className="text-line-grey hover:text-danger cursor-pointer">
+            <button title="移出" onClick={() => onDropConsultant(row.id, null)} className="text-line-grey hover:text-danger cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-danger">
               <X size={12} />
             </button>
           </div>
@@ -368,7 +368,7 @@ export function TeamPanel({ caseId, c }: { caseId: string; c: Case }) {
                       </td>
                       <td className="border-b border-dashed border-line-grey py-1 px-1.5">
                         {row.custom && (
-                          <button title="刪除" onClick={() => removeConsultant(idx)} className="text-line-grey hover:text-danger cursor-pointer">
+                          <button title="刪除" onClick={() => removeConsultant(idx)} className="text-line-grey hover:text-danger cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-danger">
                             <X size={14} />
                           </button>
                         )}

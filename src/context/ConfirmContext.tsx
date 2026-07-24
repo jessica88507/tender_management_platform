@@ -61,14 +61,14 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
               {pending.mode === "confirm" && (
                 <button
                   onClick={() => close(false)}
-                  className="bg-transparent border-[1.5px] border-tab-brown text-tab-brown py-2 px-3.5 rounded-md text-[13px] font-bold cursor-pointer hover:bg-tab-brown/10"
+                  className="bg-transparent border-[1.5px] border-tab-brown text-tab-brown py-2 px-3.5 rounded-md text-[13px] font-bold cursor-pointer hover:bg-tab-brown/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-chop-red"
                 >
                   取消
                 </button>
               )}
               <button
                 onClick={() => close(true)}
-                className="bg-chop-red text-white border-none py-3 px-5.5 rounded-lg font-bold cursor-pointer text-[15px] hover:bg-chop-red-dark"
+                className="bg-chop-red text-white border-none py-3 px-5.5 rounded-lg font-bold cursor-pointer text-[15px] hover:bg-chop-red-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-gold"
               >
                 確定
               </button>

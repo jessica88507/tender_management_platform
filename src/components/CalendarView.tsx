@@ -187,7 +187,7 @@ export function CalendarView({ caseId, c }: { caseId: string; c: Case }) {
                             e.stopPropagation();
                             setAddingDate(iso);
                           }}
-                          className="border border-line-grey rounded text-tab-brown opacity-50 hover:opacity-100 hover:bg-tab-brown hover:text-white cursor-pointer leading-none px-0.5"
+                          className="border border-line-grey rounded text-tab-brown opacity-50 hover:opacity-100 hover:bg-tab-brown hover:text-white cursor-pointer leading-none px-0.5 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-chop-red focus-visible:opacity-100"
                         >
                           <Plus size={10} />
                         </button>
@@ -227,7 +227,7 @@ export function CalendarView({ caseId, c }: { caseId: string; c: Case }) {
                             e.stopPropagation();
                             toggleExpand(iso);
                           }}
-                          className="block w-full text-center bg-transparent border border-dashed border-line-grey rounded text-tab-brown text-[10px] py-0 px-1 cursor-pointer mt-0.5 hover:bg-tab-brown/10 hover:border-tab-brown"
+                          className="block w-full text-center bg-transparent border border-dashed border-line-grey rounded text-tab-brown text-[10px] py-0 px-1 cursor-pointer mt-0.5 hover:bg-tab-brown/10 hover:border-tab-brown focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-chop-red"
                         >
                           +{hiddenCount} 展開
                         </button>
@@ -238,7 +238,7 @@ export function CalendarView({ caseId, c }: { caseId: string; c: Case }) {
                             e.stopPropagation();
                             toggleExpand(iso);
                           }}
-                          className="block w-full text-center bg-transparent border border-dashed border-line-grey rounded text-tab-brown text-[10px] py-0 px-1 cursor-pointer mt-0.5 hover:bg-tab-brown/10 hover:border-tab-brown"
+                          className="block w-full text-center bg-transparent border border-dashed border-line-grey rounded text-tab-brown text-[10px] py-0 px-1 cursor-pointer mt-0.5 hover:bg-tab-brown/10 hover:border-tab-brown focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-chop-red"
                         >
                           收合
                         </button>

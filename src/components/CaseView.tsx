@@ -66,7 +66,7 @@ export function CaseView({ caseId, caseData }: { caseId: string; caseData: Case 
         <button
           onClick={() => setViewMode("cal")}
           className={
-            "py-2.5 px-5 text-sm font-bold cursor-pointer border-r border-ink flex items-center gap-1.5 " +
+            "py-2.5 px-5 text-sm font-bold cursor-pointer border-r border-ink flex items-center gap-1.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-chop-red " +
             (ui.viewMode === "cal" ? "bg-ink text-paper-light" : "bg-paper-light text-ink-soft")
           }
         >
@@ -76,7 +76,7 @@ export function CaseView({ caseId, caseData }: { caseId: string; caseData: Case 
         <button
           onClick={() => setViewMode("list")}
           className={
-            "py-2.5 px-5 text-sm font-bold cursor-pointer flex items-center gap-1.5 " +
+            "py-2.5 px-5 text-sm font-bold cursor-pointer flex items-center gap-1.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-chop-red " +
             (ui.viewMode === "list" ? "bg-ink text-paper-light" : "bg-paper-light text-ink-soft")
           }
         >

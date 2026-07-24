@@ -22,7 +22,7 @@ export function LoginScreen({ onSignIn }: { onSignIn: () => void }) {
 
         <button
           onClick={onSignIn}
-          className="w-full flex items-center justify-center gap-2 bg-chop-red text-white border-none py-3.5 px-6 rounded-lg font-bold text-[15px] cursor-pointer hover:bg-chop-red-dark transition-colors"
+          className="w-full flex items-center justify-center gap-2 bg-chop-red text-white border-none py-3.5 px-6 rounded-lg font-bold text-[15px] cursor-pointer hover:bg-chop-red-dark transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-gold"
         >
           <SignIn weight="bold" size={19} />
           使用 Microsoft 帳號登入
