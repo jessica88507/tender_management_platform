@@ -16,7 +16,7 @@ function AppShell({ onSignOut }: { onSignOut: () => void }) {
   const [showManager, setShowManager] = useState(false);
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col h-dvh overflow-hidden">
       <Header onSignOut={onSignOut} />
       <div className="flex flex-1 min-h-0">
         <Sidebar
