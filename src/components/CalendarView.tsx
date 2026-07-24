@@ -12,6 +12,17 @@ export function CalendarView({ caseId, c }: { caseId: string; c: Case }) {
   const [addingDate, setAddingDate] = useState<string | null>(null);
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
+  const MAX_VISIBLE_TASKS = 3;
+
+  const toggleExpand = (iso: string) => {
+    setExpandedDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(iso)) next.delete(iso);
+      else next.add(iso);
+      return next;
+    });
+  };
 
   const workStart = new Date(c.workStart + "T00:00:00");
   const tenderStart = new Date(c.start + "T00:00:00");
@@ -122,6 +133,9 @@ export function CalendarView({ caseId, c }: { caseId: string; c: Case }) {
                   const dayTasks = (tasksByDate[iso] || []).slice().sort((a, b) => (b.milestone ? 1 : 0) - (a.milestone ? 1 : 0));
                   const isToday = iso === todayISO;
                   const hasAlert = alertDates.has(iso);
+                  const isExpanded = expandedDays.has(iso);
+                  const visibleTasks = isExpanded ? dayTasks : dayTasks.slice(0, MAX_VISIBLE_TASKS);
+                  const hiddenCount = dayTasks.length - visibleTasks.length;
                   return (
                     <td
                       key={iso}
@@ -162,7 +176,7 @@ export function CalendarView({ caseId, c }: { caseId: string; c: Case }) {
                         </button>
                       </div>
                       {hasAlert && <div className="cal-alert-tag">⚠️ 待處理</div>}
-                      {dayTasks.map((t) => (
+                      {visibleTasks.map((t) => (
                         <div
                           key={t.id}
                           className={
@@ -182,6 +196,28 @@ export function CalendarView({ caseId, c }: { caseId: string; c: Case }) {
                           {t.label}
                         </div>
                       ))}
+                      {hiddenCount > 0 && (
+                        <button
+                          className="cal-more-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleExpand(iso);
+                          }}
+                        >
+                          +{hiddenCount} 展開
+                        </button>
+                      )}
+                      {isExpanded && dayTasks.length > MAX_VISIBLE_TASKS && (
+                        <button
+                          className="cal-more-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleExpand(iso);
+                          }}
+                        >
+                          收合
+                        </button>
+                      )}
                     </td>
                   );
                 })}

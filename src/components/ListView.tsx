@@ -6,7 +6,7 @@ import { CATEGORIES, catColor, catIcon, catLetter } from "@/lib/constants";
 import { fmtWeekday, toISO, uid } from "@/lib/date";
 import { getOwnerOptions } from "@/lib/scheduler";
 
-function TaskRow({ caseId, t, c }: { caseId: string; t: Task; c: Case }) {
+function TaskRow({ caseId, t, c, index }: { caseId: string; t: Task; c: Case; index: number }) {
   const { updateCase } = useApp();
   const ownerOptions = getOwnerOptions(c);
   if (t.owner && !ownerOptions.includes(t.owner)) ownerOptions.push(t.owner);
@@ -30,6 +30,7 @@ function TaskRow({ caseId, t, c }: { caseId: string; t: Task; c: Case }) {
       className={"task-row" + (t.done ? " done" : "") + (t.milestone ? " milestone" : "")}
       style={{ ["--cat-color" as string]: catColor(t.cat) }}
     >
+      <span className="task-index">{index}</span>
       <input
         type="checkbox"
         className="task-check"
@@ -106,8 +107,8 @@ export function ListView({ caseId, c }: { caseId: string; c: Case }) {
               </span>
             </div>
             <div>
-              {tasks.map((t) => (
-                <TaskRow key={t.id} caseId={caseId} t={t} c={c} />
+              {tasks.map((t, idx) => (
+                <TaskRow key={t.id} caseId={caseId} t={t} c={c} index={idx + 1} />
               ))}
             </div>
             <button className="add-task-btn" onClick={() => addTask(cat)}>

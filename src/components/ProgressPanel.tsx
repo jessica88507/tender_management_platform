@@ -3,6 +3,9 @@
 import { Case } from "@/lib/types";
 import { MILESTONE_ORDER } from "@/lib/constants";
 import { caseProgress } from "@/lib/derived";
+import { daysBetween } from "@/lib/date";
+
+const MILESTONE_SOON_DAYS = 5;
 
 export function ProgressPanel({
   c,
@@ -24,11 +27,19 @@ export function ProgressPanel({
       const due = new Date(t.due + "T00:00:00");
       let posPct = ((due.getTime() - rangeStart.getTime()) / totalMs) * 100;
       posPct = Math.max(0, Math.min(100, posPct));
-      const overdue = !t.done && due < today;
+      const daysLeft = daysBetween(today, due);
+      const status = t.done ? "done" : daysLeft < 0 ? "overdue" : daysLeft <= MILESTONE_SOON_DAYS ? "soon" : "normal";
       const label = MILESTONE_ORDER.find((m) => m.key === t.milestone)?.label || t.label;
-      const cls = t.done ? "done" : overdue ? "overdue" : "pending";
-      const title = `${label}：${t.due}${t.done ? "（已完成）" : overdue ? "（已逾期！）" : ""}`;
-      return { id: t.id, posPct, cls, title };
+      const statusText =
+        status === "done"
+          ? "（已完成）"
+          : status === "overdue"
+          ? `（已逾期 ${-daysLeft} 天！）`
+          : status === "soon"
+          ? `（剩 ${daysLeft} 天，快到期）`
+          : "";
+      const title = `${label}：${t.due}${statusText}`;
+      return { id: t.id, posPct, status, title };
     });
 
   return (
@@ -37,7 +48,7 @@ export function ProgressPanel({
         📊 整體進度
         <span style={{ fontWeight: 400, fontSize: 12, color: "var(--ink-soft)" }}>
           {" "}
-          （🚩為大事記項目，隨清單勾選同步更新）
+          （圓點為大事記項目，顏色越紅代表越接近或已逾期，隨清單勾選同步更新）
         </span>
       </div>
       <div className="progress-label">
@@ -52,13 +63,9 @@ export function ProgressPanel({
         </div>
         <div className="ms-marker-layer">
           {markers.map((m) => (
-            <div
-              key={m.id}
-              className={`ms-marker ${m.cls}`}
-              style={{ left: `${m.posPct}%` }}
-              title={m.title}
-            >
-              🚩
+            <div key={m.id} className={`ms-marker ${m.status}`} style={{ left: `${m.posPct}%` }} title={m.title}>
+              <span className="ms-ring" />
+              <span className="ms-dot" />
             </div>
           ))}
         </div>

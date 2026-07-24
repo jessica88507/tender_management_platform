@@ -8,13 +8,21 @@ export function normalizeTeam(team: Partial<Team> | undefined): Team {
     mep: team?.mep ?? [],
     consultants: (team?.consultants ?? []).map((item) =>
       typeof item === "string"
-        ? { role: item, company: "", contact: "", affiliation: "", custom: true }
-        : item
+        ? { id: uid(), role: item, company: "", contact: "", affiliation: "", custom: true, team: null }
+        : {
+            id: item.id ?? uid(),
+            role: item.role,
+            company: item.company ?? "",
+            contact: item.contact ?? "",
+            affiliation: item.affiliation ?? "",
+            custom: item.custom ?? true,
+            team: item.team ?? null,
+          }
     ),
   };
   CONSULTANT_DEFAULTS.forEach((role) => {
     if (!t.consultants.some((x) => x.role === role)) {
-      t.consultants.push({ role, company: "", contact: "", affiliation: "", custom: false });
+      t.consultants.push({ id: uid(), role, company: "", contact: "", affiliation: "", custom: false, team: null });
     }
   });
   return t;

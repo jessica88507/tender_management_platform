@@ -1,9 +1,13 @@
+export type TeamGroup = "architect" | "jianguo" | null;
+
 export type Consultant = {
+  id: string;
   role: string;
   company: string;
   contact: string;
   affiliation: string;
   custom: boolean;
+  team: TeamGroup;
 };
 
 export type Team = {
