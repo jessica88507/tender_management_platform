@@ -21,28 +21,26 @@ export function ProjectManagerModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div
-      className="modal-overlay"
+      className="fixed inset-0 bg-ink/45 flex items-center justify-center z-[999]"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="modal-box" style={{ maxWidth: 760, width: "90vw" }}>
-        <h2 style={{ fontFamily: "'Noto Serif TC',serif", fontSize: 20, marginBottom: 16 }}>專案管理</h2>
+      <div className="bg-paper-light border border-line-grey rounded-[10px] py-5 px-5.5 shadow-[0_8px_24px_rgba(0,0,0,0.25)] max-w-[760px] w-[90vw]">
+        <h2 className="font-serif text-xl mb-4">專案管理</h2>
         {ids.length === 0 ? (
-          <div className="empty-state" style={{ marginTop: 20 }}>
-            目前沒有任何案件。
-          </div>
+          <div className="font-serif text-lg text-ink-soft mt-5">目前沒有任何案件。</div>
         ) : (
-          <table className="pm-table">
+          <table className="w-full border-collapse text-[13px]">
             <thead>
               <tr>
-                <th>案件名稱</th>
-                <th>開始作業期程</th>
-                <th>投標截止</th>
-                <th>剩餘天數</th>
-                <th>進度</th>
-                <th></th>
-                <th></th>
+                <th className="text-left font-mono text-[11px] text-ink-soft border-b-2 border-ink py-1.5 px-2">案件名稱</th>
+                <th className="text-left font-mono text-[11px] text-ink-soft border-b-2 border-ink py-1.5 px-2">開始作業期程</th>
+                <th className="text-left font-mono text-[11px] text-ink-soft border-b-2 border-ink py-1.5 px-2">投標截止</th>
+                <th className="text-left font-mono text-[11px] text-ink-soft border-b-2 border-ink py-1.5 px-2">剩餘天數</th>
+                <th className="text-left font-mono text-[11px] text-ink-soft border-b-2 border-ink py-1.5 px-2">進度</th>
+                <th className="border-b-2 border-ink py-1.5 px-2"></th>
+                <th className="border-b-2 border-ink py-1.5 px-2"></th>
               </tr>
             </thead>
             <tbody>
@@ -52,26 +50,29 @@ export function ProjectManagerModal({ onClose }: { onClose: () => void }) {
                 const { pct } = caseProgress(c);
                 return (
                   <tr key={id}>
-                    <td>{c.name}</td>
-                    <td style={{ fontFamily: "'IBM Plex Mono',monospace" }}>{c.workStart || c.start}</td>
-                    <td style={{ fontFamily: "'IBM Plex Mono',monospace" }}>{c.deadline.replace("T", " ")}</td>
-                    <td style={{ fontFamily: "'IBM Plex Mono',monospace", color: days < 0 ? "var(--danger)" : "var(--ink-soft)" }}>
+                    <td className="border-b border-dashed border-line-grey py-2 px-2">{c.name}</td>
+                    <td className="border-b border-dashed border-line-grey py-2 px-2 font-mono">{c.workStart || c.start}</td>
+                    <td className="border-b border-dashed border-line-grey py-2 px-2 font-mono">{c.deadline.replace("T", " ")}</td>
+                    <td className={"border-b border-dashed border-line-grey py-2 px-2 font-mono " + (days < 0 ? "text-danger" : "text-ink-soft")}>
                       {days >= 0 ? `${days} 天` : "已逾期"}
                     </td>
-                    <td style={{ fontFamily: "'IBM Plex Mono',monospace" }}>{pct}%</td>
-                    <td>
+                    <td className="border-b border-dashed border-line-grey py-2 px-2 font-mono">{pct}%</td>
+                    <td className="border-b border-dashed border-line-grey py-2 px-2">
                       <button
-                        className="pm-open"
                         onClick={() => {
                           setActiveId(id);
                           onClose();
                         }}
+                        className="bg-transparent border border-tab-brown text-tab-brown rounded-md py-1 px-2.5 text-[11.5px] cursor-pointer hover:bg-tab-brown/10"
                       >
                         開啟
                       </button>
                     </td>
-                    <td>
-                      <button className="pm-del" onClick={() => handleDelete(id)}>
+                    <td className="border-b border-dashed border-line-grey py-2 px-2">
+                      <button
+                        onClick={() => handleDelete(id)}
+                        className="bg-transparent border border-danger text-danger rounded-md py-1 px-2.5 text-[11.5px] cursor-pointer hover:bg-danger hover:text-white"
+                      >
                         刪除
                       </button>
                     </td>
@@ -81,8 +82,11 @@ export function ProjectManagerModal({ onClose }: { onClose: () => void }) {
             </tbody>
           </table>
         )}
-        <div className="modal-actions" style={{ marginTop: 16 }}>
-          <button className="btn-mini" onClick={onClose}>
+        <div className="flex justify-end mt-4">
+          <button
+            onClick={onClose}
+            className="bg-transparent border-[1.5px] border-tab-brown text-tab-brown py-2 px-3.5 rounded-md text-[13px] font-bold cursor-pointer hover:bg-tab-brown/10"
+          >
             關閉
           </button>
         </div>

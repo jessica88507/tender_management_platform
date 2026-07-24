@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { CalendarBlank, ListChecks } from "@phosphor-icons/react";
 import { Case } from "@/lib/types";
 import { useApp } from "@/context/AppContext";
 import { normalizeCase, normalizeTeam } from "@/lib/scheduler";
@@ -12,6 +13,10 @@ import { InfoPanel } from "./InfoPanel";
 import { TeamPanel } from "./TeamPanel";
 import { ListView } from "./ListView";
 import { CalendarView } from "./CalendarView";
+
+// Referenced literally so Tailwind's build-time scanner generates the CSS for this
+// arbitrary-value animation utility, even though it's applied imperatively via classList.
+const FLASH_CLASS = "animate-[flashHi_2.2s_ease]";
 
 export function CaseView({ caseId, caseData }: { caseId: string; caseData: Case }) {
   const { ui, setViewMode, updateCase } = useApp();
@@ -42,8 +47,8 @@ export function CaseView({ caseId, caseData }: { caseId: string; caseData: Case 
         const el = document.getElementById(`task-row-${taskId}`);
         if (el) {
           el.scrollIntoView({ behavior: "smooth", block: "center" });
-          el.classList.add("flash-highlight");
-          setTimeout(() => el.classList.remove("flash-highlight"), 2200);
+          el.classList.add(FLASH_CLASS);
+          setTimeout(() => el.classList.remove(FLASH_CLASS), 2200);
         }
       }, 50);
     });
@@ -57,12 +62,26 @@ export function CaseView({ caseId, caseData }: { caseId: string; caseData: Case 
       <InfoPanel caseId={caseId} c={c} totalDays={totalDays} />
       <TeamPanel caseId={caseId} c={c} />
 
-      <div className="view-toggle">
-        <button className={ui.viewMode === "cal" ? "active" : ""} onClick={() => setViewMode("cal")}>
-          📅 行事曆檢視
+      <div className="flex mb-5.5 border border-ink rounded-md overflow-hidden w-fit">
+        <button
+          onClick={() => setViewMode("cal")}
+          className={
+            "py-2.5 px-5 text-sm font-bold cursor-pointer border-r border-ink flex items-center gap-1.5 " +
+            (ui.viewMode === "cal" ? "bg-ink text-paper-light" : "bg-paper-light text-ink-soft")
+          }
+        >
+          <CalendarBlank weight="bold" size={15} />
+          行事曆檢視
         </button>
-        <button className={ui.viewMode === "list" ? "active" : ""} onClick={() => setViewMode("list")}>
-          📋 清單檢視
+        <button
+          onClick={() => setViewMode("list")}
+          className={
+            "py-2.5 px-5 text-sm font-bold cursor-pointer flex items-center gap-1.5 " +
+            (ui.viewMode === "list" ? "bg-ink text-paper-light" : "bg-paper-light text-ink-soft")
+          }
+        >
+          <ListChecks weight="bold" size={15} />
+          清單檢視
         </button>
       </div>
 

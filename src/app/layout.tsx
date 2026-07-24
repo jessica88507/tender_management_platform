@@ -3,13 +3,13 @@ import { Noto_Serif_TC, Noto_Sans_TC, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
 const notoSerifTC = Noto_Serif_TC({
-  variable: "--font-serif-tc",
+  variable: "--font-serif",
   weight: ["600", "700", "900"],
   subsets: ["latin"],
 });
 
 const notoSansTC = Noto_Sans_TC({
-  variable: "--font-sans-tc",
+  variable: "--font-sans",
   weight: ["400", "500", "700"],
   subsets: ["latin"],
 });
@@ -35,7 +35,7 @@ export default function RootLayout({
       lang="zh-Hant"
       className={`${notoSerifTC.variable} ${notoSansTC.variable} ${ibmPlexMono.variable} h-full`}
     >
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full bg-paper font-sans text-ink antialiased">{children}</body>
     </html>
   );
 }

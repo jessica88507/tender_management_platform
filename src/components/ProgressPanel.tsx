@@ -1,11 +1,24 @@
 "use client";
 
+import { ChartBar } from "@phosphor-icons/react";
 import { Case } from "@/lib/types";
 import { MILESTONE_ORDER } from "@/lib/constants";
 import { caseProgress } from "@/lib/derived";
 import { daysBetween } from "@/lib/date";
 
 const MILESTONE_SOON_DAYS = 5;
+
+const DOT_CLASS: Record<string, string> = {
+  done: "bg-line-grey opacity-55",
+  normal: "bg-accent-gold",
+  soon: "bg-amber",
+  overdue: "bg-danger",
+};
+
+const RING_CLASS: Record<string, string> = {
+  soon: "border-amber animate-[msPing_2.2s_ease-out_infinite]",
+  overdue: "border-danger animate-[msPing_1.1s_ease-out_infinite]",
+};
 
 export function ProgressPanel({
   c,
@@ -43,29 +56,34 @@ export function ProgressPanel({
     });
 
   return (
-    <div className="progress-wrap">
-      <div className="sec-title">
-        📊 整體進度
-        <span style={{ fontWeight: 400, fontSize: 12, color: "var(--ink-soft)" }}>
-          {" "}
+    <div className="mb-4.5">
+      <div className="font-serif font-bold text-[17px] mb-2 flex items-center gap-1.5">
+        <ChartBar weight="bold" size={18} className="text-chop-red" />
+        整體進度
+        <span className="font-sans font-normal text-xs text-ink-soft">
           （圓點為大事記項目，顏色越紅代表越接近或已逾期，隨清單勾選同步更新）
         </span>
       </div>
-      <div className="progress-label">
+      <div className="flex justify-between font-mono text-[13px] font-bold text-ink-soft mb-2">
         <span>
           {doneCount} / {c.tasks.length} 項已完成
         </span>
         <span>{pct}%</span>
       </div>
-      <div className="progress-track">
-        <div className="progress-bar">
-          <div className="progress-fill" style={{ width: `${pct}%` }} />
+      <div className="relative pt-5">
+        <div className="h-4 rounded-lg overflow-hidden border border-line-grey bg-[linear-gradient(90deg,var(--color-done-green),var(--color-amber)_55%,var(--color-chop-red)_100%)]">
+          <div className="h-full rounded-lg bg-ink opacity-60 transition-[width] duration-300" style={{ width: `${pct}%` }} />
         </div>
-        <div className="ms-marker-layer">
+        <div className="absolute inset-x-0 top-0 h-[22px]">
           {markers.map((m) => (
-            <div key={m.id} className={`ms-marker ${m.status}`} style={{ left: `${m.posPct}%` }} title={m.title}>
-              <span className="ms-ring" />
-              <span className="ms-dot" />
+            <div
+              key={m.id}
+              className="absolute top-1 w-3.5 h-3.5 -translate-x-1/2"
+              style={{ left: `${m.posPct}%` }}
+              title={m.title}
+            >
+              <span className={"absolute -inset-1.5 rounded-full border-2 border-transparent " + (RING_CLASS[m.status] ?? "")} />
+              <span className={"absolute inset-0 rounded-full shadow-[0_0_0_2px_var(--color-paper-light)] z-10 " + DOT_CLASS[m.status]} />
             </div>
           ))}
         </div>

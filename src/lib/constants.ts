@@ -1,3 +1,5 @@
+import { Buildings, CalendarDots, FileText, Files, Microphone, PushPin, type Icon } from "@phosphor-icons/react";
+
 export const CATEGORIES = [
   "會議安排",
   "公司內部流程",
@@ -17,28 +19,28 @@ export const CAT_LETTERS: Record<string, string> = {
 };
 
 export const CAT_COLORS: Record<string, string> = {
-  會議安排: "var(--navy)",
-  公司內部流程: "var(--olive)",
-  服務建議書製作: "var(--chop-red)",
-  "投標文件蒐集、確認": "var(--done-green)",
-  評選作業: "var(--amber)",
-  其他事項: "var(--steel)",
+  會議安排: "var(--color-navy)",
+  公司內部流程: "var(--color-olive)",
+  服務建議書製作: "var(--color-chop-red)",
+  "投標文件蒐集、確認": "var(--color-done-green)",
+  評選作業: "var(--color-amber)",
+  其他事項: "var(--color-steel)",
 };
 
-export const CAT_ICONS: Record<string, string> = {
-  會議安排: "🗓️",
-  公司內部流程: "🏢",
-  服務建議書製作: "📄",
-  "投標文件蒐集、確認": "📑",
-  評選作業: "🎤",
-  其他事項: "📌",
+export const CAT_ICON_COMPONENTS: Record<string, Icon> = {
+  會議安排: CalendarDots,
+  公司內部流程: Buildings,
+  服務建議書製作: FileText,
+  "投標文件蒐集、確認": Files,
+  評選作業: Microphone,
+  其他事項: PushPin,
 };
 
-export function catIcon(cat: string) {
-  return CAT_ICONS[cat] || "•";
+export function catIconComponent(cat: string): Icon {
+  return CAT_ICON_COMPONENTS[cat] || PushPin;
 }
 export function catColor(cat: string) {
-  return CAT_COLORS[cat] || "var(--line-grey)";
+  return CAT_COLORS[cat] || "var(--color-line-grey)";
 }
 export function catLetter(cat: string) {
   return CAT_LETTERS[cat] || "?";

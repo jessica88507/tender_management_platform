@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Bundled third-party skill scripts (ui-ux-pro-max, prisma skills) — not our source code.
+    ".claude/**",
+    ".agents/**",
+    ".windsurf/**",
   ]),
 ]);
 
