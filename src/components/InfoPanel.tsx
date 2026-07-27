@@ -64,6 +64,15 @@ export function InfoPanel({ caseId, c, totalDays }: { caseId: string; c: Case; t
         if (typeof fields.floorCount === "string" && fields.floorCount) draft.floorCount = fields.floorCount;
         if (typeof fields.tenderStart === "string" && fields.tenderStart) draft.start = fields.tenderStart;
         if (typeof fields.deadline === "string" && fields.deadline) draft.deadline = fields.deadline;
+        if (typeof fields.ownerOrg === "string" && fields.ownerOrg) draft.ownerOrg = fields.ownerOrg;
+        if (typeof fields.userUnit === "string" && fields.userUnit) draft.userUnit = fields.userUnit;
+        if (typeof fields.location === "string" && fields.location) draft.location = fields.location;
+        if (typeof fields.contractMode === "string" && fields.contractMode) draft.contractMode = fields.contractMode;
+        if (typeof fields.contractScope === "string" && fields.contractScope) draft.contractScope = fields.contractScope;
+        if (typeof fields.supervisorUnit === "string" && fields.supervisorUnit) draft.supervisorUnit = fields.supervisorUnit;
+        if (typeof fields.buildingType === "string" && fields.buildingType) draft.buildingType = fields.buildingType;
+        if (typeof fields.constructionPeriod === "string" && fields.constructionPeriod) draft.constructionPeriod = fields.constructionPeriod;
+        if (typeof fields.specialNotes === "string" && fields.specialNotes) draft.specialNotes = fields.specialNotes;
       });
       setTenderFiles([]);
       await customAlert("已自動帶入判讀結果，請確認欄位內容正確無誤後再儲存。");
@@ -76,6 +85,14 @@ export function InfoPanel({ caseId, c, totalDays }: { caseId: string; c: Case; t
   };
 
   const viewFields: [string, string][] = [
+    ["業主", c.ownerOrg || "—"],
+    ["使用單位", c.userUnit || "—"],
+    ["地點", c.location || "—"],
+    ["契約模式", c.contractMode || "—"],
+    ["承攬範圍", c.contractScope || "—"],
+    ["監造單位", c.supervisorUnit || "—"],
+    ["建築形式", c.buildingType || "—"],
+    ["合約工期", c.constructionPeriod || "—"],
     ["開始作業期程", c.workStart],
     ["招標公告時間", c.start],
     ["投標截止（日期＋時間）", c.deadline ? c.deadline.replace("T", " ") : "—"],
@@ -128,14 +145,22 @@ export function InfoPanel({ caseId, c, totalDays }: { caseId: string; c: Case; t
         )}
 
         {(!ui.infoEditing || !canEditActive) && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-2.5">
-            {viewFields.map(([label, value]) => (
-              <div key={label}>
-                <label className={labelClass}>{label}</label>
-                <div className="text-[21px] font-mono text-ink py-1 px-0.5 font-semibold">{value}</div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-2.5">
+              {viewFields.map(([label, value]) => (
+                <div key={label}>
+                  <label className={labelClass}>{label}</label>
+                  <div className="text-[21px] font-mono text-ink py-1 px-0.5 font-semibold">{value}</div>
+                </div>
+              ))}
+            </div>
+            {c.specialNotes && (
+              <div className="mb-2.5">
+                <label className={labelClass}>特殊說明</label>
+                <div className="text-[18px] text-ink py-1 px-0.5 whitespace-pre-wrap">{c.specialNotes}</div>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
 
         {ui.infoEditing && canEditActive && (
@@ -168,6 +193,83 @@ export function InfoPanel({ caseId, c, totalDays }: { caseId: string; c: Case; t
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-2.5">
+              <div>
+                <label className={labelClass}>業主</label>
+                <input
+                  type="text"
+                  className={inputClass}
+                  value={c.ownerOrg || ""}
+                  placeholder="例：桃園市政府住宅發展處"
+                  onChange={(e) => setField("ownerOrg", e.target.value)}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>使用單位</label>
+                <input
+                  type="text"
+                  className={inputClass}
+                  value={c.userUnit || ""}
+                  onChange={(e) => setField("userUnit", e.target.value)}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>地點</label>
+                <input
+                  type="text"
+                  className={inputClass}
+                  value={c.location || ""}
+                  onChange={(e) => setField("location", e.target.value)}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>契約模式</label>
+                <input
+                  type="text"
+                  className={inputClass}
+                  value={c.contractMode || ""}
+                  placeholder="例：統包，總價承攬"
+                  onChange={(e) => setField("contractMode", e.target.value)}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>承攬範圍</label>
+                <input
+                  type="text"
+                  className={inputClass}
+                  value={c.contractScope || ""}
+                  placeholder="例：建築+機電工程+設計"
+                  onChange={(e) => setField("contractScope", e.target.value)}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>監造單位</label>
+                <input
+                  type="text"
+                  className={inputClass}
+                  value={c.supervisorUnit || ""}
+                  onChange={(e) => setField("supervisorUnit", e.target.value)}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>建築形式</label>
+                <input
+                  type="text"
+                  className={inputClass}
+                  value={c.buildingType || ""}
+                  placeholder="例：一幢三棟／地下3層地上14層"
+                  onChange={(e) => setField("buildingType", e.target.value)}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>合約工期</label>
+                <input
+                  type="text"
+                  className={inputClass}
+                  value={c.constructionPeriod || ""}
+                  placeholder="例：決標後1500日竣工（50個月）"
+                  onChange={(e) => setField("constructionPeriod", e.target.value)}
+                />
+              </div>
               <div>
                 <label className={labelClass}>開始作業期程</label>
                 <input
@@ -268,6 +370,17 @@ export function InfoPanel({ caseId, c, totalDays }: { caseId: string; c: Case; t
                   onChange={(e) => setField("floorCount", e.target.value)}
                 />
               </div>
+            </div>
+
+            <div className="mb-3.5">
+              <label className={labelClass}>特殊說明</label>
+              <textarea
+                rows={2}
+                className={inputClass + " resize-none"}
+                value={c.specialNotes || ""}
+                placeholder="例：特殊結構審查、綠建築銀級以上、智慧建築合格級以上…"
+                onChange={(e) => setField("specialNotes", e.target.value)}
+              />
             </div>
 
             <div className="flex flex-col items-end gap-2.5 mt-3.5">

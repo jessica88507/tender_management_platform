@@ -103,6 +103,17 @@ export const cases = pgTable(
     floorArea: doublePrecision("floor_area").notNull().default(0),
     floorCount: text("floor_count").notNull().default(""),
 
+    // 案件基本資料 fields modeled after the company's real bid-proposal deck format.
+    ownerOrg: text("owner_org").notNull().default(""), // 業主
+    userUnit: text("user_unit").notNull().default(""), // 使用單位
+    location: text("location").notNull().default(""), // 地點
+    contractMode: text("contract_mode").notNull().default(""), // 契約模式（如：統包，總價承攬）
+    contractScope: text("contract_scope").notNull().default(""), // 承攬範圍（如：建築+機電工程+設計）
+    supervisorUnit: text("supervisor_unit").notNull().default(""), // 監造單位
+    buildingType: text("building_type").notNull().default(""), // 建築形式（棟數／地上地下層數）
+    constructionPeriod: text("construction_period").notNull().default(""), // 合約工期
+    specialNotes: text("special_notes").notNull().default(""), // 特殊說明（認證／審查等）
+
     // User-customized display order of task categories (A–F) in 任務清單, drag-reordered as
     // whole blocks. Null/absent means "use the default CATEGORIES order" (see ListView.tsx).
     categoryOrder: text("category_order").array(),

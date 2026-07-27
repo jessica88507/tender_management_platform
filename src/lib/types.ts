@@ -41,6 +41,16 @@ export type Case = {
   siteArea: number;
   floorArea: number;
   floorCount: string;
+  // 案件基本資料 fields modeled after the company's real bid-proposal deck format.
+  ownerOrg: string; // 業主
+  userUnit: string; // 使用單位
+  location: string; // 地點
+  contractMode: string; // 契約模式
+  contractScope: string; // 承攬範圍
+  supervisorUnit: string; // 監造單位
+  buildingType: string; // 建築形式
+  constructionPeriod: string; // 合約工期
+  specialNotes: string; // 特殊說明
   // Drag-reordered display order of task categories in 任務清單; null/undefined = default order.
   categoryOrder?: string[] | null;
   weekNotes: Record<string, string>;

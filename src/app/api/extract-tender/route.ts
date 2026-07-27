@@ -16,7 +16,16 @@ const EXTRACT_PROMPT = `你是招標文件判讀助手。請閱讀以上文件�
   "floorArea": number | null,
   "floorCount": string | null,
   "tenderStart": string | null,
-  "deadline": string | null
+  "deadline": string | null,
+  "ownerOrg": string | null,
+  "userUnit": string | null,
+  "location": string | null,
+  "contractMode": string | null,
+  "contractScope": string | null,
+  "supervisorUnit": string | null,
+  "buildingType": string | null,
+  "constructionPeriod": string | null,
+  "specialNotes": string | null
 }
 欄位說明：
 - contractAmount：契約金額／預算金額，單位為新台幣元的整數（例如 8500000000）
@@ -25,7 +34,16 @@ const EXTRACT_PROMPT = `你是招標文件判讀助手。請閱讀以上文件�
 - floorCount：樓層描述文字，例如「地上12層/地下3層」
 - tenderStart：招標公告日期，格式 YYYY-MM-DD
 - deadline：投標截止日期時間，格式 YYYY-MM-DDTHH:mm
-找不到的欄位請填 null，不要用猜測或編造的數字，寧可留空。`;
+- ownerOrg：業主（發包機關）名稱
+- userUnit：使用單位名稱
+- location：案址／基地地點文字描述
+- contractMode：契約模式，例如「統包，總價承攬」
+- contractScope：承攬範圍，例如「建築+機電工程+設計」
+- supervisorUnit：監造單位名稱（可能不只一個，用頓號或換行分隔）
+- buildingType：建築形式，例如「一幢三棟／地下3層地上14層」
+- constructionPeriod：合約工期文字描述，例如「決標後1500日竣工（50個月）」
+- specialNotes：特殊說明／認證要求列表，例如「特殊結構審查、綠建築銀級以上、智慧建築合格級以上」
+找不到的欄位請填 null，不要用猜測或編造的數字或文字，寧可留空。`;
 
 export async function POST(request: Request) {
   const session = await auth();

@@ -16,6 +16,15 @@ type CaseRow = {
   siteArea: number;
   floorArea: number;
   floorCount: string;
+  ownerOrg: string;
+  userUnit: string;
+  location: string;
+  contractMode: string;
+  contractScope: string;
+  supervisorUnit: string;
+  buildingType: string;
+  constructionPeriod: string;
+  specialNotes: string;
   categoryOrder: string[] | null;
   createdByUserId: string | null;
   tasks: {
@@ -92,6 +101,15 @@ export function rowToCase(row: CaseRow): Case {
     siteArea: row.siteArea,
     floorArea: row.floorArea,
     floorCount: row.floorCount,
+    ownerOrg: row.ownerOrg,
+    userUnit: row.userUnit,
+    location: row.location,
+    contractMode: row.contractMode,
+    contractScope: row.contractScope,
+    supervisorUnit: row.supervisorUnit,
+    buildingType: row.buildingType,
+    constructionPeriod: row.constructionPeriod,
+    specialNotes: row.specialNotes,
     categoryOrder: row.categoryOrder,
     weekNotes,
     team: { architect, mep, consultants },

@@ -50,6 +50,15 @@ async function main() {
     siteArea: 3200,
     floorArea: 18500,
     floorCount: "地上12層/地下3層",
+    ownerOrg: "台北市立圖書館",
+    userUnit: "台北市立圖書館",
+    location: "台北市內湖區文湖段",
+    contractMode: "統包，總價承攬",
+    contractScope: "建築+機電工程+設計",
+    supervisorUnit: "台灣世曦工程顧問股份有限公司",
+    buildingType: "一幢一棟／地上12層地下3層",
+    constructionPeriod: "決標後900日竣工（30個月）",
+    specialNotes: "綠建築銀級以上、智慧建築合格級以上、無障礙住宅建築標章",
     weekNotes: {
       "2026-08-02": "確認顧問團隊委託書用印進度",
     },
@@ -88,6 +97,15 @@ async function main() {
       siteArea: caseData.siteArea,
       floorArea: caseData.floorArea,
       floorCount: caseData.floorCount,
+      ownerOrg: caseData.ownerOrg,
+      userUnit: caseData.userUnit,
+      location: caseData.location,
+      contractMode: caseData.contractMode,
+      contractScope: caseData.contractScope,
+      supervisorUnit: caseData.supervisorUnit,
+      buildingType: caseData.buildingType,
+      constructionPeriod: caseData.constructionPeriod,
+      specialNotes: caseData.specialNotes,
     })
     .returning();
 
