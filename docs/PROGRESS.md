@@ -5,6 +5,35 @@
 
 ---
 
+## 2026-07-25 — Database wiring, Prisma→Drizzle switch, redesign pass, admin role
+
+- [x] Switched the ORM from Prisma to Drizzle at the user's explicit request, mid-migration: removed `prisma/`,
+      `prisma.config.ts`, `src/generated/prisma`, `src/lib/prisma.ts` entirely; rebuilt schema/client/adapter on
+      Drizzle (`src/db/schema.ts`, `src/db/index.ts`, `drizzle.config.ts`, `@auth/drizzle-adapter`). See
+      `DECISIONS.md` #12.
+- [x] Real authentication: NextAuth (Auth.js) v5 credentials provider, bcrypt password hashing, JWT sessions,
+      department-gated `authorize()`. Replaced the old mock sign-in state in `LoginScreen`/`ClientApp`.
+- [x] Case CRUD fully backed by Postgres: `GET/POST /api/cases`, `PATCH/DELETE /api/cases/[id]`, all inside
+      Drizzle transactions. Ownership enforced via `bidLeadUserId` (null = unclaimed/editable by anyone, who
+      then becomes the claimant on next save).
+- [x] Rewrote `AppContext` to fetch/save through the API instead of `localStorage` (see `DECISIONS.md` #13) —
+      verified end-to-end via direct `psql` queries that writes from the UI (e.g. toggling a task's `done`
+      checkbox) actually persist to Postgres.
+- [x] Redesign pass using the `ui-ux-pro-max` skill properly (actually ran its `search.py` tool this time, after
+      user feedback that the first attempt skipped it): restructured `CaseView` into three labeled sections
+      (案件總覽/案件設定/時程管理), added a `Header` + `MainView` split that didn't exist before, fixed
+      Sidebar/MainView sharing one scroll region instead of scrolling independently (`min-h-screen` → `h-dvh
+      overflow-hidden`), applied the skill's one genuinely-applicable finding (missing focus-visible states)
+      across interactive elements.
+- [x] Added a system-administrator role (`users.role`, migration `0002_steady_psylocke.sql`): admin accounts
+      bypass the 業務部 department gate, get routed to a new `AdminShell` with two sidebar sections — **系統
+      成員** (`MembersPanel` — add/list/delete member accounts via `/api/users`) and **專案管理**
+      (`AdminProjectsPanel` — read-only list of every case, reusing `GET /api/cases`). Seeded an admin account
+      (`admin@example.com` / `admin2026`). See `DECISIONS.md` #14.
+- [x] Verified end-to-end in-browser as both roles: member login → case view renders correctly; admin login →
+      member list loads, add-member round-trips to Postgres (confirmed via `psql`), delete-member round-trips
+      too, all-projects list renders real case data.
+
 ## 2026-07-25 — Full UI redesign: Tailwind + login screen + doc conventions
 
 - [x] Installed the third-party Claude Code skill `ui-ux-pro-max` (a design-intelligence database; source

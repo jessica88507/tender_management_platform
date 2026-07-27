@@ -40,7 +40,7 @@ export function getOwnerOptions(c: Case): string[] {
   (c.team.architect || []).forEach((n) => n && opts.push(n));
   (c.team.mep || []).forEach((n) => n && opts.push(n));
   (c.team.consultants || []).forEach((row) => row.contact && opts.push(row.contact));
-  ["業主", "估算部", "模型資訊部", "建築師", "機電團隊"].forEach((x) => opts.push(x));
+  ["業主", "估算部", "模型資訊部", "建築師", "機電團隊", "備標團隊"].forEach((x) => opts.push(x));
   return Array.from(new Set(opts));
 }
 
@@ -60,6 +60,10 @@ function generateRecurringMeetings(start: Date, deadlineDate: Date, weekday: num
 
 export function generateTasks(c: Case): Task[] {
   const start = new Date(c.start + "T00:00:00");
+  // 開始作業期程 (internal work-prep start) vs 招標公告 (public tender announcement) — two
+  // distinct anchor dates; defaults to the same day as `start` until edited separately in
+  // InfoPanel (see normalizeCase), so most cases see no change from using this anchor.
+  const workStartDate = new Date((c.workStart || c.start) + "T00:00:00");
   const deadlineDT = new Date(c.deadline);
   const deadlineDate = new Date(deadlineDT.getFullYear(), deadlineDT.getMonth(), deadlineDT.getDate());
   const tasks: Task[] = [];
@@ -74,6 +78,7 @@ export function generateTasks(c: Case): Task[] {
       id: uid(),
       cat,
       label,
+      note: "",
       owner: owner || c.bidLead || "",
       due: toISO(dateObj),
       done: false,
@@ -90,7 +95,6 @@ export function generateTasks(c: Case): Task[] {
     add("會議安排", `例行會議＃${String(i + 1).padStart(2, "0")}（${WEEKDAY_NAMES[weekday]}）`, "", d)
   );
   add("會議安排", "統包啟動會議", "", snapToBizDay(addDays(start, -7)));
-  add("會議安排", "內部（董事會）期初成果報告", "", snapToBizDay(addDays(start, 10)));
   add(
     "會議安排",
     "吳董設計會議（設計定稿，領標後3~4週）",
@@ -104,12 +108,16 @@ export function generateTasks(c: Case): Task[] {
   const preBidDates =
     preBidCount === 3
       ? [addDays(deadlineDate, -7), addDays(deadlineDate, -5), addDays(deadlineDate, -3)].map(snapToBizDay)
-      : [snapToBizDay(addDays(deadlineDate, -4))];
+      : [snapToBizDay(addDays(deadlineDate, -7))];
   preBidDates.forEach((d, i) =>
     add("會議安排", preBidCount > 1 ? `標前會＃${i + 1}` : "標前會", "", d, "prebid")
   );
   const firstPreBid = preBidDates.reduce((a, b) => (a < b ? a : b));
+  const lastPreBid = preBidDates.reduce((a, b) => (a > b ? a : b));
 
+  // Must come after 工程事業簽呈 (eng_signoff, below) is actually signed — both are currently
+  // scheduled independently, so re-check ordering manually if firstPreBid ever lands close to
+  // the deadline.
   add(
     "會議安排",
     "備標團隊公證（需標前協議書簽署完成）",
@@ -138,16 +146,16 @@ export function generateTasks(c: Case): Task[] {
   const estimateEnd = snapToBizDay(addDays(firstPreBid, -7));
   const estimateStart = snapToBizDay(addDays(estimateEnd, -14));
   const architectDeliver = snapToBizDay(addDays(estimateStart, -1));
-  add("投標文件蒐集、確認", "投標前估算數量（估算部，2週作業）", "估算部", estimateStart);
+  add("投標文件蒐集、確認", "估算數量作業開始（估算部，2週作業）", "估算部", estimateStart);
   add("投標文件蒐集、確認", "估算部完成估算（需於標前會前1~1.5週完成）", "估算部", estimateEnd);
   add("投標文件蒐集、確認", "建築師提供平立面／剖面／門窗表／外觀材質", "建築師", architectDeliver);
-  add("投標文件蒐集、確認", "投標成本定稿（標前會前5天提交）", "", snapToBizDay(addDays(firstPreBid, -5)));
-  add("投標文件蒐集、確認", "內部成本簽核", "", snapToBizDay(addDays(firstPreBid, -1)));
-  add("投標文件蒐集、確認", "內部標前會議", "", snapToBizDay(addDays(firstPreBid, -1)));
-  add("投標文件蒐集、確認", "內部核決", "", snapToBizDay(addDays(firstPreBid, 1)));
-  add("投標文件蒐集、確認", "確認設計顧問委託及顧問團隊（領標後一週內）", "", snapToBizDay(addDays(start, 7)));
+  add("投標文件蒐集、確認", "投標成本定稿（標前會前5天提交）", "", snapToBizDay(addDays(firstPreBid, -3)));
+  add("投標文件蒐集、確認", "內部成本簽核", "", snapToBizDay(addDays(lastPreBid, -1)));
+  // 投標截止前後2~3天：實際方向未指定，先取投標截止前2天，需再與實際情況確認。
+  add("投標文件蒐集、確認", "內部核決", "", snapToBizDay(addDays(deadlineDate, -2)));
+  add("投標文件蒐集、確認", "確認設計顧問委託及顧問團隊（領標後一週內）", "", snapToBizDay(addDays(workStartDate, 7)));
   add("投標文件蒐集、確認", "投標資格文件彙整（投標截止前一週）", "", snapToBizDay(addDays(deadlineDate, -7)));
-  add("投標文件蒐集、確認", "押標金", "", snapToBizDay(addDays(deadlineDate, -8)));
+  add("投標文件蒐集、確認", "押標金申請", "", snapToBizDay(addDays(start, 2)));
   add(
     "投標文件蒐集、確認",
     "投標資格實績公證＋統包廠商JV公證合作同意書（投標截止前一週內）",
@@ -171,18 +179,17 @@ export function generateTasks(c: Case): Task[] {
   add("投標文件蒐集、確認", "投標截止", "", deadlineDate, "deadline");
 
   const totalDays = Math.max(daysBetween(start, deadlineDate), 1);
-  ([
-    ["公開招標", 0.95, "業主"],
-    ["疑義澄清", 0.55, "業主／技術處"],
-    ["投標／開標作業（業主流程）", 0.0, "業主"],
-  ] as [string, number, string][]).forEach(([label, f, owner]) =>
-    add("其他事項", label, owner, new Date(deadlineDate.getTime() - f * totalDays * 86400000))
-  );
+
+  // 招標公告日本身即為公開招標日，不再用比例推算；實際日期仍應以招標文件為準，必要時手動調整。
+  add("其他事項", "公開招標", "業主", start);
+  add("其他事項", "提出釋疑", "備標團隊", addDays(start, Math.round(totalDays / 4)));
+  // 業主流程，實際日期仍應以招標文件為準，必要時手動調整。
+  add("其他事項", "投標／開標作業（業主流程）", "業主", addDays(deadlineDate, 1));
+
   ([
     ["初步設計規劃", 0.85],
     ["設計圖說V2", 0.6],
     ["投標前設計圖說定稿", 0.4],
-    ["BIM綠能分析", 0.35],
     ["建材設備選用表", 0.32],
     ["建築模型1/100", 0.3],
     ["工程進度／工序定稿", 0.25],
@@ -192,11 +199,10 @@ export function generateTasks(c: Case): Task[] {
 
   add("評選作業", "施工評選簡報（業主端）", "業主", addDays(deadlineDate, 5));
   add("評選作業", "決選廠商", "業主", addDays(deadlineDate, 20));
-  add("評選作業", "BIM模型動畫模擬工序", "模型資訊部", addDays(deadlineDate, -10));
   add("評選作業", "完成建築設計動畫（90秒）", "", addDays(deadlineDate, -5));
   add("評選作業", "施工評選簡報初稿", "", addDays(deadlineDate, -3));
   add("評選作業", "施工評選簡報定稿", "", addDays(deadlineDate, 1));
-  add("評選作業", "簡報模擬", "", addDays(deadlineDate, 3));
+  add("評選作業", "簡報模擬", "", addDays(deadlineDate, 14));
 
   return tasks.sort((a, b) => new Date(a.due).getTime() - new Date(b.due).getTime());
 }

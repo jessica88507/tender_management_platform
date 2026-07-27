@@ -139,6 +139,55 @@ bespoke CSS classes or emoji-as-icon going forward (brand colors, the stamp moti
 ## 11. Database seed data reuses the scheduling engine
 
 **Context**: Need demo data for local dev and demos.
-**Decision**: `prisma/seed.ts` imports `generateTasks` from `src/lib/scheduler.ts` directly and generates the
+**Decision**: `src/db/seed.ts` imports `generateTasks` from `src/lib/scheduler.ts` directly and generates the
 seed case's tasks with the real scheduling rules, rather than hand-writing fake tasks — keeps seed data from
 drifting out of sync with the actual scheduling logic.
+
+## 12. Switched ORM from Prisma to Drizzle (mid-migration)
+
+**Context**: The DB schema and NextAuth adapter wiring were already built on Prisma 7 (decisions 3, 5) when the
+user explicitly asked to switch to Drizzle instead ("dazzle 幫我改用 不要用 prisma") — no specific reason given,
+treated as a direct preference rather than something to push back on.
+**Decision**: Full clean removal and rebuild rather than a partial patch: deleted `prisma/`, `prisma.config.ts`,
+`src/generated/prisma`, `src/lib/prisma.ts`; added `src/db/schema.ts` (Drizzle table defs + `relations()`),
+`src/db/index.ts` (client singleton), `drizzle.config.ts`, and switched the NextAuth adapter to
+`@auth/drizzle-adapter`.
+**Gotcha found along the way**: NextAuth v5's `next-auth/jwt` re-exports the `JWT` interface from
+`@auth/core/jwt` via `export *`, which silently breaks `declare module "next-auth/jwt"` augmentation (TS error
+"Type '{}' is not assignable to type 'string'" on custom fields). Fix: augment `"@auth/core/jwt"` directly (see
+`src/types/next-auth.d.ts`) — confirmed via `grep -n "interface JWT"` in `node_modules` that this is the
+interface's actual home.
+**Consequence**: All future schema/migration work uses Drizzle conventions (`npm run db:generate` /
+`db:migrate`, see `CLAUDE.md`'s Database section) — don't reintroduce Prisma.
+
+## 13. Wired AppContext to the real API instead of localStorage
+
+**Context**: Case data was still round-tripping through `localStorage` even after the Postgres schema and CRUD
+API routes existed — the user flagged this explicitly ("App 目前資料還是存在瀏覽器 localStorage...幫我串資料庫").
+**Decision**: `AppContext` now fetches `/api/cases` in a real `useEffect` on mount (exposed as a `loading` flag)
+and debounces `PATCH` writes per-case-id (400ms) instead of debouncing a single `localStorage.setItem`. This is
+a genuine network call, not a sync-from-external-store effect, so it doesn't trigger the
+`react-hooks/set-state-in-effect` lint rule that blocked a naive `useEffect` in the localStorage era (see
+decision 2) — see `CLAUDE.md`'s Rendering section for how this distinction is drawn.
+**Consequence**: `localStorage` now only holds `bid-scheduler-last-active-id` (which case tab to reopen — a UI
+convenience), no case data.
+
+## 14. System-administrator role added (`users.role`)
+
+**Context**: The user asked for a system-admin account that can manage member accounts (add/list/delete) and
+see a list of every project across all users, reachable from two new Sidebar entries (系統成員/專案管理) rather
+than being folded into the existing per-case bid-lead UI.
+**Decision**: Added `users.role` (`pgEnum`, `"member" | "admin"`, default `"member"`) rather than reusing
+`department` for this — department is about which business unit someone belongs to (used for the 業務部 login
+gate), role is about system-level permissions, and conflating the two would make the login gate logic harder to
+reason about. Admin accounts bypass the department gate entirely (`src/auth.ts`).
+**UI decision**: Built a completely separate `AdminShell` (own Header + Sidebar + content), rather than adding
+admin-only branches inside the existing case-focused `AppShell`/`Sidebar`/`MainView`. Reasoning: the admin role
+has a deliberately minimal, unrelated feature set (member management + a read-only project list) — it doesn't
+touch `AppContext`'s case-editing state machine at all, so forcing it through the same component tree would add
+conditional branches to components that otherwise have nothing to do with user/role management.
+**Scope decision**: `AdminProjectsPanel` reuses the existing `GET /api/cases` (which already returns every case
+unfiltered, regardless of caller) rather than adding a new admin-specific endpoint — no filtering-by-owner logic
+exists on that route today, so there was nothing extra to build. Member management is intentionally add+list+
+delete only (no edit-in-place) per the user's "不用其他東西" (nothing else needed) — don't add an edit flow
+unless asked.

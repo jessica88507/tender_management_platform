@@ -10,7 +10,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run lint` — ESLint (flat config, `eslint-config-next` + React Compiler / hooks-purity rules)
 - `npx tsc --noEmit` — type-check only, no build artifacts
 - `docker compose up -d` — start the local PostgreSQL container (`bid-scheduler-db`)
-- `npx prisma migrate dev` — apply schema changes; `npx prisma db seed` — reseed sample data
+- `npm run db:generate` — generate a Drizzle migration from `src/db/schema.ts`; `npm run db:migrate` — apply
+  pending migrations; `npm run db:seed` — reseed demo + admin accounts and sample case data; `npm run db:studio`
+  — open Drizzle Studio
 - There is no test suite/script in this project yet.
 
 ## Project docs (`docs/`)
@@ -19,7 +21,7 @@ Read these before making non-trivial changes — they're kept up to date on purp
 
 - `docs/PROJECT_SPEC.md` — the original functional spec (scheduling rules, data model, UI spec) handed off by
   the user. If a scheduling rule or UI behavior seems arbitrary, check here first before "fixing" it.
-- `docs/DECISIONS.md` (decisions) — why each architectural choice was made, including Prisma-7-specific gotchas and
+- `docs/DECISIONS.md` (decisions) — why each architectural choice was made, including the Drizzle ORM choice and
   the localStorage→Postgres migration reasoning. Add an entry here whenever you make a non-obvious call.
 - `docs/PROGRESS.md` (progress) — reverse-chronological log of completed work. Append to the top when you finish a
   batch of work; don't rewrite history.
@@ -37,27 +39,44 @@ tasks (meetings, internal sign-offs, proposal production, document collection, e
 to the company's real bid-prep workflow, and tracks 9 key milestones. Users manage cases from a sidebar, and view
 tasks either as a categorized checklist or as a draggable weekly calendar.
 
-Case data currently still lives in the browser's `localStorage` (key `bid-cases`), mirroring the original
-artifact's `window.storage` persistence — the frontend has **not yet** been wired to the database (see below).
-A PostgreSQL database + full Prisma schema already exists (`prisma/schema.prisma`, migrated and seeded) in
-preparation for multi-user access with department-gated login and per-case edit permissions (only the 主投標手
-can edit their own case; everyone else in 業務部 gets read-only). Wiring the frontend to real API routes and
-turning on Microsoft Entra ID login are the next two milestones — see `docs/MEMORY.md` for exactly what's blocking
-each one before you start on them.
+Case data lives in PostgreSQL (via Drizzle ORM, see below) — `AppContext` fetches `/api/cases` on mount and
+debounces writes back through `PATCH`/`POST`/`DELETE` API routes. Login is real email/password credentials
+auth (NextAuth/Auth.js), gated to 業務部 accounts, with per-case edit permission (only the 主投標手 who created
+or claimed a case can edit/delete it — others get read-only). A separate `role` flag on `users` supports a
+system-administrator account (bypasses the department gate) that gets its own admin shell — see "Admin role"
+below — for member management and a cross-case project list, instead of the regular case-editing UI. Microsoft
+Entra ID SSO and Outlook sync remain future work blocked on the user obtaining Azure AD credentials — see
+`docs/MEMORY.md`.
+
+### Admin role
+
+`users.role` is `"member"` (default) or `"admin"`. Admin accounts:
+- Bypass the `department === "業務部"` login gate (`src/auth.ts`'s `authorize()`).
+- Get routed to `AdminShell` instead of the regular `AppShell` in `ClientApp.tsx`, based on
+  `session.user.role` (propagated through the JWT/session callbacks in `src/auth.ts` and the module
+  augmentation in `src/types/next-auth.d.ts`).
+- See two sidebar sections (`AdminSidebar.tsx`): **系統成員** (`MembersPanel.tsx` — add/list/delete member
+  accounts via `/api/users`, admin-only) and **專案管理** (`AdminProjectsPanel.tsx` — a read-only list of every
+  case across all users, reusing the same `GET /api/cases` the regular app uses since it already returns all
+  cases unfiltered).
+- The admin shell intentionally does *not* reuse `AppContext`/`AppProvider` — admins don't edit individual
+  cases, so there's no need to pull in the case-editing state machine for this role.
 
 ## Architecture
 
 ### Rendering: everything is client-only, on purpose
 
 `src/app/page.tsx` is a client component that lazy-loads `src/components/ClientApp.tsx` via
-`next/dynamic(..., { ssr: false })`. This is deliberate, not an oversight: case state is read synchronously from
-`localStorage` via a `useState(() => loadState())` lazy initializer in `AppContext` (no loading effect, no
-loading-flag gate). Reading `window.localStorage` during SSR would return empty data and diverge from the
-client's real data, causing a hydration mismatch — disabling SSR for this subtree sidesteps that entirely.
-Keep this pattern if you touch initial-load logic; don't reintroduce an `useEffect` that just calls `setState`
-on mount purely to sync from an external store — the lint rule `react-hooks/set-state-in-effect` (part of the
-React Compiler–aware config in `eslint-config-next`) will flag it, and the intended fix is exactly this
-lazy-init + `ssr:false` combo, not a bigger loading-state machine.
+`next/dynamic(..., { ssr: false })`. This predates the DB migration (case state used to be read synchronously
+from `localStorage` via a lazy `useState` initializer, which genuinely can't run during SSR without a hydration
+mismatch) and was kept as-is once the app moved to API-backed data, since `useSession()` (NextAuth) is also
+client-only and there's nothing meaningful to server-render before a session is known anyway.
+
+`AppContext` now loads case data with a real `useEffect` + `fetch("/api/cases")` on mount (see `loading` in its
+return value) — this is a genuine network call, not a sync-from-external-store effect, so it's fine under the
+`react-hooks/set-state-in-effect` lint rule (part of the React Compiler–aware config in `eslint-config-next`).
+That rule only blocks effects that call `setState` purely to mirror something already available synchronously
+(e.g. `localStorage`) — don't confuse the two when deciding whether a new effect needs a lazy-init workaround.
 
 The lint config also enforces `react-hooks/purity`: don't call `Date.now()` (or similar impure calls) directly
 in a component/hook body — pull it through a plain helper function instead (see `src/lib/derived.ts`'s
@@ -88,11 +107,14 @@ any manual edits/completions — that's existing, intentional behavior, not a bu
 
 ### State management (`src/context/`)
 
-- `AppContext.tsx` — the single source of truth: `state: AppState` (all cases, persisted) plus transient UI
-  state (`viewMode`, panel open/edit flags) that intentionally resets when switching cases. `updateCase(id, fn)`
-  is the standard way to mutate a case: it deep-clones the case, runs `fn` on the draft, and replaces it — use
-  this rather than reaching into `state.cases` directly from components. Saves to `localStorage` are debounced
-  400ms after `state` changes.
+- `AppContext.tsx` — the single source of truth: `state: AppState` (all cases, fetched from `/api/cases` on
+  mount) plus transient UI state (`viewMode`, panel open/edit flags) that intentionally resets when switching
+  cases. `updateCase(id, fn)` is the standard way to mutate a case: it deep-clones the case, runs `fn` on the
+  draft, updates local state immediately (optimistic), and debounces a `PATCH /api/cases/[id]` 400ms later per
+  case id — use this rather than reaching into `state.cases` directly from components. `createCase`/`deleteCase`
+  call `POST`/`DELETE` directly (no debounce). Errors from any of these surface via `useConfirm().customAlert`.
+  `bid-scheduler-last-active-id` is still kept in `localStorage`, but purely as a UI convenience (which case tab
+  to reopen) — it holds no case data itself anymore.
 - `ConfirmContext.tsx` — replaces the original HTML tool's custom-modal confirm/alert (native `confirm()`/
   `alert()` were unreliable in that tool's sandboxed environment; this Promise-based modal is the direct port
   of that same workaround, kept for UI consistency, not because Next.js has the same sandbox issue). Use
@@ -100,6 +122,9 @@ any manual edits/completions — that's existing, intentional behavior, not a bu
   dialogs when you need a blocking confirmation in this app.
 
 ### Component tree
+
+`ClientApp` branches on `session.user.role` right after login: `"admin"` renders `AdminShell` (see "Admin role"
+above); everything below this point is the regular `"member"` tree, wrapped in `AppProvider`.
 
 `ClientApp` → `Sidebar` (case tabs + "＋新增案件") and, in `.main`, either `NewCaseForm` (no active case) or
 `CaseView` (active case). `CaseView` composes `CaseHeader` (title + days-left "chop stamp"), `AlertBanner`
@@ -113,26 +138,33 @@ independent of the sidebar.
 `onDragStart`/`onDrop`) rather than a library — keep it that way unless multi-day drag or touch support is
 actually needed.
 
-### Database (`prisma/`, `src/lib/prisma.ts`)
+### Database (`src/db/`, Drizzle ORM)
 
-Prisma **7** — noticeably different from most Prisma tutorials/training data (v7 made driver adapters
-mandatory, moved connection config to `prisma.config.ts`, and changed the default generator/output). Before
-touching anything Prisma-related, skim `.claude/skills/prisma-*` (installed locally, mirrors the official
-`prisma/skills` repo) rather than assuming v5/v6 conventions:
+Postgres via **Drizzle ORM** (`drizzle-orm` + `drizzle-kit` + `pg` driver) — chosen over Prisma partway through
+the DB migration; see `docs/DECISIONS.md` #3 and #12 for why.
 
-- Generator is `prisma-client` (not `prisma-client-js`), output to `src/generated/prisma` (gitignored, run
-  `npx prisma generate` to regenerate — don't hand-edit anything under there).
-- `PrismaClient` **requires** a driver adapter — see `src/lib/prisma.ts` for the singleton (`@prisma/adapter-pg`
-  wired to `DATABASE_URL`). Never instantiate `new PrismaClient()` without the adapter.
-- Connection URL lives in `prisma.config.ts` (loaded via `dotenv/config`), not inline in `schema.prisma`.
-- Schema models: `users`/`accounts`/`sessions`/`verification_tokens` follow the standard NextAuth Prisma-adapter
-  shape (extended with `users.department` for the 業務部-only login gate) — keep this shape intact so the
-  NextAuth Adapter can be dropped in later without a schema rewrite. Domain tables (`cases`, `tasks`,
-  `team_members`, `consultants`, `week_notes`) mirror the `src/lib/types.ts` shapes but as normalized rows with
-  an explicit `sortIndex` (Postgres rows don't preserve array order the way the old JSON blob did — don't drop
-  this field when writing the eventual CRUD API).
-- `prisma/seed.ts` generates its sample case by calling the real `generateTasks()` scheduling engine rather than
-  hand-writing fake tasks — keep doing this so seed data never drifts from the actual scheduling rules.
+- `src/db/schema.ts` — table definitions + `relations()` (enables `db.query.cases.findMany({ with: {...} })`).
+  `users`/`accounts`/`sessions`/`verification_tokens` follow the standard Auth.js Drizzle-adapter shape,
+  extended with `department` (業務部-only login gate), `passwordHash` (credentials login), and `role`
+  (`"member" | "admin"` — see "Admin role" above). Domain tables (`cases`, `tasks`, `team_members`,
+  `consultants`, `week_notes`) mirror the `src/lib/types.ts` shapes but as normalized rows with an explicit
+  `sortIndex` (Postgres rows don't preserve array order the way the old JSON blob did — don't drop this field).
+  `cases.deadline` is `text`, not `timestamp` — this app is timezone-naive throughout by design, and a
+  `timestamp` column would risk silent off-by-timezone bugs; keep new date/time columns `text` unless there's a
+  real reason to need timezone-aware storage.
+- `src/db/index.ts` — the Drizzle client singleton (`pg.Pool` + `drizzle(pool, { schema })`, dev-mode global
+  caching so hot-reload doesn't open a new pool every save).
+- `drizzle.config.ts` — points `drizzle-kit` at `src/db/schema.ts` / `./drizzle` (migrations output) /
+  `DATABASE_URL`. After editing `schema.ts`, run `npm run db:generate` then `npm run db:migrate` — never
+  hand-edit files under `drizzle/`.
+- `src/db/seed.ts` — generates its sample case by calling the real `generateTasks()` scheduling engine rather
+  than hand-writing fake tasks (keep doing this so seed data never drifts from the actual scheduling rules), and
+  seeds one demo member account plus one admin account (credentials logged to stdout when it runs).
+- API routes under `src/app/api/` are the only server-side Drizzle callers — `src/lib/scheduler.ts` and anything
+  it imports (like `constants.ts`) must stay free of React-component imports, since it's shared between client
+  components and these server routes; icon components live in `src/lib/categoryIcons.tsx` specifically to keep
+  that boundary clean (importing `@phosphor-icons/react` from `constants.ts` previously broke the production
+  build with `TypeError: createContext is not a function` when collecting `/api/cases` page data).
 
 ### Styling
 
@@ -168,9 +200,14 @@ migration — not a small targeted fix), follow this standing process rather tha
    large task list — do the work, verify it, and give one consolidated summary at the end. This matches how
    the project owner prefers to work (see `docs/MEMORY.md`).
 
-## Known gap vs. the original spec
+## 招標文件自動判讀 (`src/app/api/extract-tender`)
 
-The original HTML tool's "招標文件自動判讀" (upload a tender PDF, extract text with pdf.js, send it to the
-Claude API to auto-fill contract amount / site area / floor area / deadline) was intentionally not ported. That
-flow called `api.anthropic.com` directly from client-side JS, which would mean shipping an API key in the
-browser bundle — not something to reintroduce without a real backend/proxy to hold the key server-side.
+The original HTML tool's tender-document auto-read feature called `api.anthropic.com` directly from
+client-side JS, which would've shipped an API key in the browser bundle — it was deliberately not ported
+that way. It's since been rebuilt properly: `InfoPanel`'s edit mode has a multi-file upload (PDF or images)
+that posts to `src/app/api/extract-tender/route.ts`, a server-side Route Handler that holds
+`ANTHROPIC_API_KEY` and calls the Anthropic SDK directly (PDF pages / images as native `document`/`image`
+content blocks, not client-side text extraction) to extract `contractAmount`/`siteArea`/`floorArea`/
+`floorCount`/`tenderStart`/`deadline` as JSON, which the client then merges into the draft case (user still
+reviews/edits before saving — nothing auto-saves). Requires `ANTHROPIC_API_KEY` in `.env` (get one from
+console.anthropic.com); without it, the route returns a clear error and every other feature is unaffected.

@@ -1,0 +1,1 @@
+ALTER TABLE "cases" ALTER COLUMN "deadline" SET DATA TYPE text;

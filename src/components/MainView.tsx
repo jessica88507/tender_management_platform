@@ -19,20 +19,24 @@ function CaseViewWrapper({ caseId, onMount }: { caseId: string; onMount: () => v
 export function MainView({
   explicitNew,
   onCaseMounted,
+  mainRef,
 }: {
   explicitNew: boolean;
   onCaseMounted: () => void;
+  mainRef?: React.RefObject<HTMLElement | null>;
 }) {
   const { activeId, state } = useApp();
   const showForm = !activeId || !state.cases[activeId];
 
   return (
-    <main className="flex-1 py-8 px-11 pb-15 max-w-[1240px] overflow-y-auto">
-      {showForm ? (
-        <NewCaseForm showEmptyState={!explicitNew} />
-      ) : (
-        <CaseViewWrapper caseId={activeId!} onMount={onCaseMounted} />
-      )}
+    <main ref={mainRef} className="flex-1 overflow-y-auto">
+      <div className="max-w-[1240px] py-5 px-4 pb-10 sm:py-8 sm:px-11 sm:pb-15">
+        {showForm ? (
+          <NewCaseForm showEmptyState={!explicitNew} />
+        ) : (
+          <CaseViewWrapper caseId={activeId!} onMount={onCaseMounted} />
+        )}
+      </div>
     </main>
   );
 }

@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1784912942715,
+      "tag": "0000_supreme_manta",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784963199676,
+      "tag": "0001_fair_fallen_one",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784964132107,
+      "tag": "0002_steady_psylocke",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785077104037,
+      "tag": "0003_acoustic_ben_parker",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785079947724,
+      "tag": "0004_sturdy_next_avengers",
+      "breakpoints": true
+    }
+  ]
+}

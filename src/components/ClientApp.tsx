@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { FolderOpen } from "@phosphor-icons/react";
+import { useEffect, useRef, useState } from "react";
+import { useSession, signOut } from "next-auth/react";
+import { ArrowUp, FolderOpen } from "@phosphor-icons/react";
 import { AppProvider, useApp } from "@/context/AppContext";
 import { ConfirmProvider } from "@/context/ConfirmContext";
 import { Header } from "@/components/Header";
@@ -9,15 +10,32 @@ import { Sidebar } from "@/components/Sidebar";
 import { MainView } from "@/components/MainView";
 import { ProjectManagerModal } from "@/components/ProjectManagerModal";
 import { LoginScreen } from "@/components/LoginScreen";
+import { AdminShell } from "@/components/AdminShell";
 
-function AppShell({ onSignOut }: { onSignOut: () => void }) {
-  const { setActiveId } = useApp();
+function AppShell({
+  userName,
+  department,
+}: {
+  userName?: string | null;
+  department?: string | null;
+}) {
+  const { setActiveId, loading } = useApp();
   const [explicitNew, setExplicitNew] = useState(false);
   const [showManager, setShowManager] = useState(false);
+  const [showBackToTop, setShowBackToTop] = useState(false);
+  const mainRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+    const onScroll = () => setShowBackToTop(el.scrollTop > 400);
+    el.addEventListener("scroll", onScroll);
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [loading]);
 
   return (
     <div className="flex flex-col h-dvh overflow-hidden">
-      <Header onSignOut={onSignOut} />
+      <Header userName={userName} department={department} onSignOut={() => signOut()} />
       <div className="flex flex-1 min-h-0">
         <Sidebar
           onShowNew={() => {
@@ -25,14 +43,30 @@ function AppShell({ onSignOut }: { onSignOut: () => void }) {
             setExplicitNew(true);
           }}
         />
-        <MainView explicitNew={explicitNew} onCaseMounted={() => setExplicitNew(false)} />
+        {loading ? (
+          <div className="flex-1 flex items-center justify-center text-ink-soft text-[18px]">載入案件資料中…</div>
+        ) : (
+          <MainView explicitNew={explicitNew} onCaseMounted={() => setExplicitNew(false)} mainRef={mainRef} />
+        )}
       </div>
       <button
         onClick={() => setShowManager(true)}
-        className="fixed left-4.5 bottom-4.5 z-[500] bg-ink text-paper-light border-none py-3 px-5 rounded-3xl text-sm font-bold cursor-pointer shadow-[0_4px_14px_rgba(0,0,0,0.3)] hover:bg-chop-red flex items-center gap-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-gold"
+        className="fixed left-4.5 bottom-4.5 z-[500] bg-ink text-card border-none py-3 px-5 rounded-3xl text-[18px] font-bold cursor-pointer shadow-[0_4px_14px_rgba(0,0,0,0.3)] hover:bg-primary flex items-center gap-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-highlight"
       >
         <FolderOpen weight="fill" size={16} />
         專案管理
+      </button>
+      <button
+        onClick={() => mainRef.current?.scrollTo({ top: 0, behavior: "smooth" })}
+        title="回到頂部"
+        aria-hidden={!showBackToTop}
+        tabIndex={showBackToTop ? 0 : -1}
+        className={
+          "fixed right-4.5 bottom-4.5 z-[500] w-11 h-11 rounded-full bg-ink text-card border-none cursor-pointer shadow-[0_4px_14px_rgba(0,0,0,0.3)] hover:bg-primary flex items-center justify-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-highlight transition-opacity duration-200 " +
+          (showBackToTop ? "opacity-100" : "opacity-0 pointer-events-none")
+        }
+      >
+        <ArrowUp weight="bold" size={18} />
       </button>
       {showManager && <ProjectManagerModal onClose={() => setShowManager(false)} />}
     </div>
@@ -40,16 +74,28 @@ function AppShell({ onSignOut }: { onSignOut: () => void }) {
 }
 
 export default function ClientApp() {
-  const [signedIn, setSignedIn] = useState(false);
+  const { data: session, status } = useSession();
 
-  if (!signedIn) {
-    return <LoginScreen onSignIn={() => setSignedIn(true)} />;
+  if (status === "loading") {
+    return <div className="min-h-screen flex items-center justify-center bg-background text-ink-soft text-[18px]">載入中…</div>;
+  }
+
+  if (!session) {
+    return <LoginScreen />;
+  }
+
+  if (session.user?.role === "admin") {
+    return (
+      <ConfirmProvider>
+        <AdminShell userName={session.user?.name} />
+      </ConfirmProvider>
+    );
   }
 
   return (
     <ConfirmProvider>
       <AppProvider>
-        <AppShell onSignOut={() => setSignedIn(false)} />
+        <AppShell userName={session.user?.name} department={session.user?.department} />
       </AppProvider>
     </ConfirmProvider>
   );

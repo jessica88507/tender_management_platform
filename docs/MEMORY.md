@@ -6,18 +6,18 @@
 ## Currently blocked / waiting on external input
 
 1. **Microsoft Entra ID (Azure AD) App Registration doesn't exist yet**
-   - The user (or their IT) needs to go to [portal.azure.com](https://portal.azure.com) → Microsoft Entra ID →
-     App registrations → New registration, create a single-tenant SPA app, and get a **Client ID** and
-     **Tenant ID**.
-   - This is the one step I genuinely can't do on their behalf (needs their own Azure permissions).
+   - The user explicitly said not to worry about this for now ("Azure AD Client ID這些不用，先用一般的帳號密碼
+     登入就好") — real login (NextAuth credentials provider, bcrypt-hashed passwords, department-gated) is
+     built and working; Entra ID SSO is deferred, not blocking anything currently in progress.
+   - If picked back up later: the user (or their IT) needs to go to [portal.azure.com](https://portal.azure.com)
+     → Microsoft Entra ID → App registrations → New registration, create a single-tenant SPA app, and get a
+     **Client ID** and **Tenant ID** — the one step that genuinely needs their own Azure permissions.
    - Once that exists, this unblocks:
      - Wiring up NextAuth.js's Microsoft Entra ID provider (each person signs in with their own company
-       Microsoft account).
-     - Reading the user's `department` field to restrict login to 業務部 only.
+       Microsoft account) alongside (or instead of) the existing credentials provider.
+     - Reading the user's `department` field to restrict login to 業務部 only (already implemented, just against
+       manually-set `department` values rather than one synced from Microsoft Graph).
      - Calling the Microsoft Graph Calendar API for optional task/meeting → Outlook sync.
-   - Confirmed by the user: **each person logs in with their own Microsoft account** (not a shared account) —
-     already reflected in the `users`/`accounts`/`sessions` table design (standard NextAuth multi-user adapter
-     shape).
 
 2. **Open questions from the original spec (`docs/PROJECT_SPEC.md` §9) still have no new answers**
    - 統包啟動會議 (kickoff meeting): currently kept at "one week before tender announcement" (`start - 7
@@ -40,30 +40,33 @@
 ## Current stack at a glance (details in `CLAUDE.md`)
 
 - **Frontend**: Next.js (App Router) + TypeScript + Tailwind CSS v4 + Phosphor Icons
-- **State management**: still React Context + `localStorage` (not yet wired to the real backend API — the
-  database is ready but the frontend hasn't been switched over)
+- **State management**: React Context (`AppContext`), fetches/saves through real API routes backed by Postgres
+  — `localStorage` only holds a UI convenience (last-active case tab), no case data anymore
 - **Database**: PostgreSQL 16, local via Docker Compose (`docker-compose.yml`, container `bid-scheduler-db`)
-- **ORM**: Prisma 7 (a very new major version — usage differs from most Prisma 5/6 tutorials online; see
-  `DECISIONS.md` #3)
-- **Auth**: schema is ready (standard NextAuth tables), but the actual NextAuth config and Microsoft Entra ID
-  provider wiring haven't been written yet — blocked on item 1's Azure AD Client ID
+- **ORM**: Drizzle (`drizzle-orm` + `drizzle-kit` + `pg`) — switched from Prisma mid-project at the user's
+  explicit request; see `DECISIONS.md` #12
+- **Auth**: NextAuth (Auth.js) v5, Credentials provider (email/password, bcrypt-hashed), JWT sessions,
+  department-gated (`業務部` only, admin accounts bypass this) — working end-to-end. Microsoft Entra ID SSO is
+  still deferred (item 1 above), not currently blocking anything
+- **Roles**: `users.role` (`"member" | "admin"`) — admin accounts get a separate `AdminShell` for member
+  management (add/list/delete) and a cross-case project list; see `DECISIONS.md` #14 and `CLAUDE.md`'s
+  "Admin role" section
 
 ## Suggested next steps, in order
 
-1. Switch the frontend from localStorage to real API calls (Next.js Route Handlers + Prisma) — this doesn't
-   need Azure AD and can be done now.
-2. Once the user provides the Azure AD Client ID / Tenant ID, wire up NextAuth.js + the Microsoft Entra ID
-   provider, plus the "業務部 only" login gate and "only the bid lead can edit their own case" permission
-   checks.
-3. Once permissions are stable, build two-way Outlook sync (Microsoft Graph Calendar API).
+1. If/when the user wants Microsoft Entra ID SSO, wire up NextAuth.js's Entra ID provider alongside the
+   existing credentials provider, plus sync `department` from Microsoft Graph instead of setting it manually.
+2. Once that's stable, build two-way Outlook sync (Microsoft Graph Calendar API) — the `syncToOutlook`/
+   `outlookEventId` columns already exist on `tasks` for this.
+3. Otherwise, no other work is currently blocked — case CRUD, auth, and admin/member-management are all live.
 
 ## The user's working-style preferences (for future me)
 
-- **Communication language**: switched from Chinese back to **English** partway through this session (initial
-  request was Chinese; user then said to use English going forward for chat and docs). The actual product UI
-  stays in Traditional Chinese on purpose (real end users are Chinese-speaking staff at a Taiwan engineering
-  firm) — this English-only preference is about *our* collaboration (chat, docs, commit messages), not the
-  product's own UI copy or the verbatim-quoted `PROJECT_SPEC.md`.
+- **Communication language**: has switched between Chinese and English mid-project more than once (Chinese →
+  English → back to Chinese, as of 2026-07-25) — treat whichever language the user's most recent message is in
+  as the current preference for chat replies, and don't assume it's fixed. The product UI itself always stays
+  Traditional Chinese regardless of chat language (real end users are Chinese-speaking staff at a Taiwan
+  engineering firm) — this is a firm constraint, not tied to the chat-language toggle at all.
 - When handing off large/multi-part work, prefers "finish everything, then notify once" — don't pop up with a
   progress report after every small step.
 - For large UI-redesign tasks, expects a browser-screenshot verification loop before calling it done (now

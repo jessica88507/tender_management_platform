@@ -1,22 +1,81 @@
 @import "tailwindcss";
 
+/* Manual light/dark toggle (not just prefers-color-scheme) — ThemeToggle.tsx stamps
+   data-theme="dark"/"light" on <html>, and this custom-variant lets components use dark: when a
+   per-element override is genuinely needed on top of the variable-swap below. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 @theme {
-  --color-paper: #ede6d6;
-  --color-paper-light: #f8f4ea;
-  --color-ink: #241e15;
-  --color-ink-soft: #5b5342;
-  --color-chop-red: #ae362b;
-  --color-chop-red-dark: #8c271e;
-  --color-tab-brown: #8c6239;
-  --color-line-grey: #b8af98;
-  --color-done-green: #4e6b47;
-  --color-accent-gold: #c9a063;
-  --color-danger: #a6392e;
-  --color-steel: #5e7180;
-  --color-navy: #3f5c73;
-  --color-olive: #77843a;
-  --color-amber: #a8752e;
-  --color-weekend-red: #b23a2e;
+  /* Structural surfaces */
+  --color-background: #f8fafc;
+  --color-card: #ffffff;
+  --color-muted: #eef2f7;
+  --color-border: #e2e8f0;
+
+  /* Text */
+  --color-ink: #0f172a;
+  --color-ink-soft: #64748b;
+
+  /* Brand + semantic actions */
+  --color-primary: #0369a1;
+  --color-primary-dark: #075985;
+  --color-accent: #334155;
+  --color-highlight: #b45309;
+  --color-danger: #dc2626;
+  --color-done-green: #059669;
+
+  /* Soft tints (banners, calendar cell states) */
+  --color-danger-soft: #fee2e2;
+  --color-highlight-soft: #fef3c7;
+  --color-success-soft: #d1fae5;
+
+  /* Category / data-viz colors (task categories A–F, weekend labels) — kept distinct from
+     primary/danger so category-coded chips never get mistaken for brand actions or alerts. */
+  --color-steel: #475569;
+  --color-navy: #1e3a5f;
+  --color-sky: #38bdf8;
+  --color-olive: #65a30d;
+  --color-amber: #d97706;
+  --color-rose: #be185d;
+  --color-weekend-red: #e11d48;
+
+  /* Elevation — kept as a token (not a raw rgba() in components) so shadow depth can differ
+     per theme; a light offset shadow barely reads on dark cards, so dark mode needs more alpha. */
+  --shadow-tab: rgba(0, 0, 0, 0.06);
+}
+
+/* Dark theme: same token names, same shapes, different values — every component that already
+   uses these utilities (bg-card, text-ink, border-border, etc.) re-themes automatically with zero
+   component changes, since Tailwind utilities all resolve through these CSS custom properties. */
+:root[data-theme="dark"] {
+  --color-background: #0b1220;
+  --color-card: #131b2e;
+  --color-muted: #1a2338;
+  --color-border: #2a3550;
+
+  --color-ink: #f1f5f9;
+  --color-ink-soft: #94a3b8;
+
+  --color-primary: #38bdf8;
+  --color-primary-dark: #0ea5e9;
+  --color-accent: #94a3b8;
+  --color-highlight: #fbbf24;
+  --color-danger: #f87171;
+  --color-done-green: #34d399;
+
+  --color-danger-soft: #3f1518;
+  --color-highlight-soft: #3f2d0a;
+  --color-success-soft: #0f3b2e;
+
+  --color-steel: #94a3b8;
+  --color-navy: #60a5fa;
+  --color-sky: #7dd3fc;
+  --color-olive: #a3e635;
+  --color-amber: #fbbf24;
+  --color-rose: #f472b6;
+  --color-weekend-red: #fb7185;
+
+  --shadow-tab: rgba(0, 0, 0, 0.55);
 }
 
 /*
@@ -40,19 +99,33 @@
 @keyframes alertGlow {
   0%,
   100% {
-    box-shadow: 0 0 0 rgba(174, 54, 43, 0);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
   }
   50% {
-    box-shadow: 0 0 12px rgba(174, 54, 43, 0.45);
+    box-shadow: 0 0 32px 10px rgba(239, 68, 68, 0.7);
+  }
+}
+
+/* Overdue 大事記 (milestones) flash faster/brighter than the general alertGlow above — they're
+   meant to read as a higher-severity signal than an ordinary overdue task. */
+@keyframes milestoneOverdueFlash {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    background-color: var(--color-card);
+  }
+  50% {
+    box-shadow: 0 0 18px 5px rgba(239, 68, 68, 0.85);
+    background-color: var(--color-danger-soft);
   }
 }
 
 @keyframes flashHi {
   0% {
-    background-color: var(--color-accent-gold);
+    background-color: var(--color-highlight);
   }
   60% {
-    background-color: var(--color-accent-gold);
+    background-color: var(--color-highlight);
   }
   100% {
     background-color: transparent;
@@ -62,20 +135,45 @@
 @keyframes calAlertPulse {
   0%,
   100% {
-    box-shadow: inset 0 0 0 2px var(--color-chop-red);
+    box-shadow: inset 0 0 0 2px var(--color-danger);
   }
   50% {
-    box-shadow: inset 0 0 0 2px var(--color-chop-red), 0 0 8px rgba(174, 54, 43, 0.5);
+    box-shadow: inset 0 0 0 2px var(--color-danger), 0 0 8px rgba(220, 38, 38, 0.5);
   }
 }
 
 @keyframes calAlertPulseToday {
   0%,
   100% {
-    box-shadow: inset 0 0 0 3px var(--color-done-green), inset 0 0 0 2px var(--color-chop-red);
+    box-shadow: inset 0 0 0 3px var(--color-done-green), inset 0 0 0 2px var(--color-danger);
   }
   50% {
-    box-shadow: inset 0 0 0 3px var(--color-done-green), inset 0 0 0 2px var(--color-chop-red),
-      0 0 8px rgba(174, 54, 43, 0.5);
+    box-shadow: inset 0 0 0 3px var(--color-done-green), inset 0 0 0 2px var(--color-danger),
+      0 0 8px rgba(220, 38, 38, 0.5);
+  }
+}
+
+/* ProgressPanel: bar sweeps from 0 to its real width via the --target-width custom property,
+   set inline per-render since it depends on the runtime completion %. Re-triggered on every
+   case open via a `key` remount on ProgressPanel. */
+@keyframes barFill {
+  from {
+    width: 0%;
+  }
+  to {
+    width: var(--target-width);
+  }
+}
+
+/* Section entrance — CaseView's three main zones fade/slide in on mount for a livelier,
+   less static first paint. */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

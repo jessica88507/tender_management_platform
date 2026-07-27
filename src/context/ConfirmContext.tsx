@@ -43,13 +43,13 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
       {children}
       {pending && (
         <div
-          className="fixed inset-0 bg-ink/45 flex items-center justify-center z-[999]"
+          className="fixed inset-0 bg-black/45 flex items-center justify-center z-[999]"
           onClick={(e) => {
             if (e.target === e.currentTarget) close(false);
           }}
         >
-          <div className="bg-paper-light border border-line-grey rounded-[10px] py-5 px-5.5 max-w-[380px] shadow-[0_8px_24px_rgba(0,0,0,0.25)]">
-            <div className="text-[13px] leading-relaxed text-ink mb-4">
+          <div className="bg-card border border-border rounded-[10px] py-5 px-5.5 max-w-[380px] shadow-[0_8px_24px_rgba(0,0,0,0.25)]">
+            <div className="text-[17px] leading-relaxed text-ink mb-4">
               {pending.message.split("\n").map((line, i) => (
                 <span key={i}>
                   {line}
@@ -61,14 +61,14 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
               {pending.mode === "confirm" && (
                 <button
                   onClick={() => close(false)}
-                  className="bg-transparent border-[1.5px] border-tab-brown text-tab-brown py-2 px-3.5 rounded-md text-[13px] font-bold cursor-pointer hover:bg-tab-brown/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-chop-red"
+                  className="bg-transparent border-[1.5px] border-accent text-accent py-2 px-3.5 rounded-md text-[17px] font-bold cursor-pointer hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                 >
                   取消
                 </button>
               )}
               <button
                 onClick={() => close(true)}
-                className="bg-chop-red text-white border-none py-3 px-5.5 rounded-lg font-bold cursor-pointer text-[15px] hover:bg-chop-red-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-gold"
+                className="bg-primary text-white border-none py-3 px-5.5 rounded-lg font-bold cursor-pointer text-[19.5px] hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-highlight"
               >
                 確定
               </button>
