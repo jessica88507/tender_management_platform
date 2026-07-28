@@ -5,7 +5,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 - `npm run dev` — start the dev server (Turbopack) at http://localhost:3000
-- `npm run build` — production build (also type-checks and runs `next build`'s static generation)
+- `npm run build` — runs `db:migrate` against `DATABASE_URL` first, then the production build (also
+  type-checks and runs `next build`'s static generation). This is deliberate: Vercel just runs `npm run build`
+  on every deploy, so baking the migration in here is what makes schema changes apply automatically in
+  production without a manual step. `drizzle-kit migrate` only applies migrations that haven't run yet
+  (tracked in its own journal table), so re-running it on an already-up-to-date database is a safe no-op —
+  but it does mean `DATABASE_URL` must be set and reachable wherever `build` runs, including in Vercel's
+  build step, not just at runtime.
 - `npm run start` — serve the production build
 - `npm run lint` — ESLint (flat config, `eslint-config-next` + React Compiler / hooks-purity rules)
 - `npx tsc --noEmit` — type-check only, no build artifacts
