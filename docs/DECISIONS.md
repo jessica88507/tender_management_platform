@@ -312,3 +312,59 @@ through:
 accuracy ceiling than the Anthropic version had — expected and accepted by the user as the tradeoff for
 avoiding an API dependency. Every extracted field is still a draft the user reviews before saving (unchanged
 from before), which is what makes shipping this accuracy tradeoff acceptable at all.
+
+## 21. 案件資訊: 標案形式 field added, 契約模式 became a fixed dropdown, 每坪造價 computed
+
+**Context**: User asked for three specific `InfoPanel` changes: 契約模式 (was free text) should be a dropdown
+limited to 最有利標／最低價; a new 標案形式 field (統包工程／私人案); and 契約金額 should be considered together
+with 總樓地板面積 — confirmed via a clarifying question that this specifically meant computing and displaying
+每坪造價 (cost per 坪), the standard construction-industry unit-cost metric, not just placing the two fields
+near each other in the layout.
+**Decision**:
+- `tenderType` is a new real `cases` column (`text`, default `""`) — not folded into an existing field — for
+  the same reason `contractMode` already has its own column: it's a distinct concept from every other 案件基本
+  資料 field, and treating it as free text (rather than a config-driven dynamic field system) matches how every
+  other field in this section already works. Added straight through the whole stack: `db/schema.ts` →
+  migration `0009_greedy_sandman.sql` → `Case` type → `caseMapper.ts` → both `/api/cases` routes → seed data.
+- Both `tenderType` and `contractMode` follow the existing "unknown value gets an extra `<option>`" pattern
+  already used for 主投標手's select (`InfoPanel.tsx`) — old/imported data that doesn't match either fixed
+  option still displays and round-trips correctly instead of silently resetting to blank.
+- 每坪造價 is **not** a stored column — pure derived display (`contractAmount / (floorArea / 3.305785)`,
+  rounded), computed inline in `InfoPanel.tsx` from the two existing fields. Shown read-only in both view mode
+  (a new row in `viewFields`) and edit mode (a disabled input, since there's nothing to directly edit — you
+  change the two inputs it's derived from instead). 總樓地板面積's display also gained a "約 X 坪" conversion
+  hint (both the read-only view value and a small helper line under the edit-mode input) since the same 3.305785
+  conversion factor is directly relevant there too.
+**Consequence**: If a case's `contractAmount` or `floorArea` is 0/unset, 每坪造價 shows "—" (view) or an empty
+disabled input with a placeholder explaining why (edit) — never a `NaN`/`Infinity` division artifact.
+
+## 22. Calendar highlighted range now ends at 決選廠商, not a hardcoded deadline+14
+
+**Context**: `CalendarView`'s "active range" highlight (non-muted background; days outside it get `bg-muted`)
+ended at a hardcoded `addDays(deadline, 14)`, labeled as 施工評選簡報日 in a comment. The user asked for the
+range to instead run through 決選廠商 (final vendor decision) — a separate, later milestone
+(`taskTemplates.ts`'s `final_vendor` row, `deadline + 15` by default).
+**Decision**: Instead of just changing the magic number from 14 to 15, look up the real generated task
+(`c.tasks.find(t => t.key === "final_vendor")`) and use *its* `due` date, falling back to `addDays(deadline, 15)`
+only if that task is missing (e.g. an admin disabled the rule). This keeps the highlight correct if the rule's
+offset is ever changed via the admin 預設排程規則 panel, rather than drifting out of sync with a second
+hardcoded copy of the same offset.
+**Consequence**: The calendar's footer hint text ("...超出統包啟動會議～決選廠商的範圍...") was updated to match.
+
+## 23. Fixed dragged calendar events getting stuck at opacity-25 ("反白") after a successful move
+
+**Context**: User reported that after dragging a task to a new date on `CalendarView`, the event card would
+render washed-out/colorless (`反白`) instead of its normal category-colored appearance, instead of the drag's
+intended (correctly-colored) end state.
+**Root cause**: `draggingId` (used to apply `opacity-25` to the card being dragged, for visual feedback during
+the drag) was only ever cleared in the dragged element's own `onDragEnd` handler. But a successful drop calls
+`moveTask`, which changes the task's `due` date — moving that task to a *different* `<td>` in the next render.
+React can tear down the original DOM node (the one the browser's native `dragend` event would fire on) before
+that event fires, so `onDragEnd` never runs and `draggingId` stays set to the moved task's id forever — the
+moved task keeps matching `draggingId === t.id` in its new cell and renders at 25% opacity indefinitely.
+**Decision**: Also call `setDraggingId(null)` directly inside the `<td>`'s `onDrop` handler (right after
+`moveTask`), not just in `onDragEnd` — this guarantees the state clears on every successful drop regardless of
+whether the source element survives to fire its own `dragend`.
+**Verification note**: consistent with `DECISIONS.md` #7 — the browser automation tool can't drive native
+HTML5 drag-and-drop directly, so this was verified by dispatching real `DragEvent`s (`dragstart`/`dragover`/
+`drop`/`dragend`) via JS and checking the moved card's computed `opacity` was back to `1` afterward.

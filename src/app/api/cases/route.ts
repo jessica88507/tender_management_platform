@@ -49,6 +49,7 @@ export async function POST(request: Request) {
     ownerOrg: "",
     userUnit: "",
     location: "",
+    tenderType: "",
     contractMode: "",
     contractScope: "",
     supervisorUnit: "",

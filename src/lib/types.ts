@@ -57,7 +57,8 @@ export type Case = {
   ownerOrg: string; // 業主
   userUnit: string; // 使用單位
   location: string; // 地點
-  contractMode: string; // 契約模式
+  tenderType: string; // 標案形式（統包工程／私人案）
+  contractMode: string; // 契約模式（最有利標／最低價）
   contractScope: string; // 承攬範圍
   supervisorUnit: string; // 監造單位
   buildingType: string; // 建築形式
