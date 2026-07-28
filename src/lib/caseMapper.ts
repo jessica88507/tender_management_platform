@@ -19,6 +19,7 @@ type CaseRow = {
   ownerOrg: string;
   userUnit: string;
   location: string;
+  tenderType: string;
   contractMode: string;
   contractScope: string;
   supervisorUnit: string;
@@ -112,6 +113,7 @@ export function rowToCase(row: CaseRow): Case {
     ownerOrg: row.ownerOrg,
     userUnit: row.userUnit,
     location: row.location,
+    tenderType: row.tenderType,
     contractMode: row.contractMode,
     contractScope: row.contractScope,
     supervisorUnit: row.supervisorUnit,

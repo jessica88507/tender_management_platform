@@ -5,6 +5,26 @@
 
 ---
 
+## 2026-07-28 — 案件資訊: 標案形式 field, 契約模式 dropdown, 每坪造價 (branch `feature/case-info-fields`)
+
+- [x] Added `tenderType` (標案形式: 統包工程／私人案) as a new `cases` column end-to-end (schema, migration
+      `0009_greedy_sandman.sql`, `Case` type, `caseMapper.ts`, both `/api/cases` routes, seed data), rendered as
+      a dropdown in `InfoPanel.tsx`.
+- [x] Converted 契約模式 from a free-text input to a dropdown (最有利標／最低價) — existing values that don't
+      match either option still show up correctly (extra `<option>` injected for them, same pattern as 主投標手).
+- [x] Added a computed, read-only 每坪造價 (cost per 坪) field: `contractAmount ÷ (floorArea 換算坪)`, shown in
+      both view and edit mode; 總樓地板面積 also gained a "約 X 坪" conversion hint. See `DECISIONS.md` #20.
+- [x] 總樓地板面積's "約 X 坪" conversion now shows 2 decimal places with thousands separators (was 1 decimal,
+      no separators) per follow-up user request.
+- [x] `CalendarView`: the highlighted "active" date range now ends at the real 決選廠商 task's due date instead
+      of a hardcoded `deadline+14` — see `DECISIONS.md` #21.
+- [x] Fixed a real bug: dragging a calendar event to a new date could leave it stuck at 25% opacity
+      (washed-out/colorless, "反白") forever, because `draggingId` was only cleared in `onDragEnd`, which can
+      fail to fire when the dragged element moves to a different table cell mid-drop. Now also cleared
+      directly in `onDrop`. See `DECISIONS.md` #22.
+- [x] Verified in-browser: dropdowns save/round-trip correctly, 每坪造價 computes correctly (tested
+      100,000,000 元 ÷ 1,000 m² → 330,579 元/坪), mobile (390px) layout stacks cleanly with no overflow.
+
 ## 2026-07-28 — Consultant edit/delete, 招標公告/投標截止 alert cleanup, mobile responsive fixes, font sizing
 
 - [x] Fixed 招標公告/投標截止 (milestone `collect`/`deadline`) still nagging as if they were overdue action

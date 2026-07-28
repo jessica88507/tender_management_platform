@@ -52,6 +52,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         ownerOrg: body.ownerOrg ?? "",
         userUnit: body.userUnit ?? "",
         location: body.location ?? "",
+        tenderType: body.tenderType ?? "",
         contractMode: body.contractMode ?? "",
         contractScope: body.contractScope ?? "",
         supervisorUnit: body.supervisorUnit ?? "",

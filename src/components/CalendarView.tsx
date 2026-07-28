@@ -33,12 +33,15 @@ export function CalendarView({ caseId, c }: { caseId: string; c: Case }) {
   const tenderStart = new Date(c.start + "T00:00:00");
   const deadlineDT = new Date(c.deadline);
   const deadline = new Date(deadlineDT.getFullYear(), deadlineDT.getMonth(), deadlineDT.getDate());
-  // Highlighted "active" range runs from 統包啟動會議 (kickoff, 招標公告前7天) through 施工評選簡報日
-  // (eval presentation day, 投標截止後14天) — see scheduler.ts's "kickoff"/"eval_presentation_day"
-  // rules — so both bookend events actually fall inside the highlighted range, not just the
-  // narrower 招標公告～投標截止 window.
+  // Highlighted "active" range runs from 統包啟動會議 (kickoff, 招標公告前7天) through 決選廠商 (final
+  // vendor decision) — so both bookend events actually fall inside the highlighted range, not just
+  // the narrower 招標公告～投標截止 window. Reads the actual generated "final_vendor" task's due date
+  // (rather than hardcoding deadline+15) so this stays correct if that rule's offset is ever changed
+  // via the admin's 預設排程規則 panel; falls back to the template's default offset only if that task
+  // is somehow missing (e.g. disabled).
   const kickoff = addDays(tenderStart, -7);
-  const evalDay = addDays(deadline, 14);
+  const finalVendorTask = c.tasks.find((t) => t.key === "final_vendor");
+  const evalDay = finalVendorTask ? new Date(finalVendorTask.due + "T00:00:00") : addDays(deadline, 15);
   const rangeStart = [workStart, tenderStart, kickoff].reduce((a, b) => (a < b ? a : b));
   const rangeEnd = addDays(deadline, 30);
 
@@ -198,6 +201,13 @@ export function CalendarView({ caseId, c }: { caseId: string; c: Case }) {
                         setDragOverDate(null);
                         const taskId = e.dataTransfer.getData("text/plain");
                         if (taskId) moveTask(taskId, iso);
+                        // Moving the task to a new due date re-renders it into a different <td>,
+                        // which can tear down the original dragged DOM node before the browser
+                        // fires its native `dragend` — leaving draggingId stuck on this task's id
+                        // forever (rendered permanently at opacity-25, looking washed-out/colorless
+                        // instead of its real category color). Clear it here too, not just in
+                        // onDragEnd, so a completed drop always resets it regardless of that race.
+                        setDraggingId(null);
                       }}
                     >
                       <div
@@ -306,7 +316,7 @@ export function CalendarView({ caseId, c }: { caseId: string; c: Case }) {
       </div>
 
       <div className="text-[13px] text-ink-soft mt-2.5 font-mono">
-        提示：點日期格右上角「＋」可直接新增事件；點選事件卡片可檢視詳情；拖曳事件卡片到其他日期即可改期，會自動同步回任務清單／整體進度上的大事記標記。淺色網底的日期表示已超出統包啟動會議～施工評選簡報日的範圍（之後仍保留至投標截止後1個月供評選作業使用）。
+        提示：點日期格右上角「＋」可直接新增事件；點選事件卡片可檢視詳情；拖曳事件卡片到其他日期即可改期，會自動同步回任務清單／整體進度上的大事記標記。淺色網底的日期表示已超出統包啟動會議～決選廠商的範圍（之後仍保留至投標截止後1個月供評選作業使用）。
       </div>
 
       {addingDate && (

@@ -1,0 +1,1 @@
+ALTER TABLE "cases" ADD COLUMN "tender_type" text DEFAULT '' NOT NULL;

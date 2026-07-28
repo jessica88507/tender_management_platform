@@ -17,6 +17,12 @@ const labelClass = "block text-[16px] text-ink-soft font-mono mb-1 tracking-wide
 const btnMiniClass =
   "inline-flex items-center gap-1.5 bg-transparent border-[1.5px] border-accent text-accent py-2 px-3.5 rounded-md text-[18px] font-bold cursor-pointer hover:bg-accent/10 active:scale-[0.97] transition-transform focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 
+const TENDER_TYPE_OPTIONS = ["統包工程", "私人案"];
+const CONTRACT_MODE_OPTIONS = ["最有利標", "最低價"];
+// 1 坪 = 3.305785 m² — the standard conversion factor used throughout Taiwan real-estate/
+// construction industry practice.
+const SQM_PER_PING = 3.305785;
+
 export function InfoPanel({ caseId, c, totalDays }: { caseId: string; c: Case; totalDays: number }) {
   const { ui, setInfoOpen, setInfoEditing, updateCase, canEditActive } = useApp();
   const { customConfirm, customAlert } = useConfirm();
@@ -85,10 +91,15 @@ export function InfoPanel({ caseId, c, totalDays }: { caseId: string; c: Case; t
     }
   };
 
+  const floorAreaPing = c.floorArea ? c.floorArea / SQM_PER_PING : 0;
+  const costPerPing = c.contractAmount && c.floorArea ? Number(c.contractAmount) / floorAreaPing : 0;
+  const formatPing = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   const viewFields: [string, string][] = [
     ["業主", c.ownerOrg || "—"],
     ["使用單位", c.userUnit || "—"],
     ["地點", c.location || "—"],
+    ["標案形式", c.tenderType || "—"],
     ["契約模式", c.contractMode || "—"],
     ["承攬範圍", c.contractScope || "—"],
     ["監造單位", c.supervisorUnit || "—"],
@@ -102,7 +113,8 @@ export function InfoPanel({ caseId, c, totalDays }: { caseId: string; c: Case; t
     ["例行會議固定星期", WEEKDAY_NAMES[Number(c.meetingWeekday) || 0]],
     ["契約金額（元）", c.contractAmount ? Number(c.contractAmount).toLocaleString() : "—"],
     ["基地面積（m²）", c.siteArea ? String(c.siteArea) : "—"],
-    ["總樓地板面積（m²）", c.floorArea ? String(c.floorArea) : "—"],
+    ["總樓地板面積（m²）", c.floorArea ? `${c.floorArea}（約 ${formatPing(floorAreaPing)} 坪）` : "—"],
+    ["每坪造價（元/坪）", costPerPing ? Math.round(costPerPing).toLocaleString() : "—"],
     ["預計設計樓層", c.floorCount || "—"],
   ];
 
@@ -271,14 +283,40 @@ export function InfoPanel({ caseId, c, totalDays }: { caseId: string; c: Case; t
                 />
               </div>
               <div>
+                <label className={labelClass}>標案形式</label>
+                <select
+                  className={inputClass}
+                  value={c.tenderType || ""}
+                  onChange={(e) => setField("tenderType", e.target.value)}
+                >
+                  <option value="">—</option>
+                  {!TENDER_TYPE_OPTIONS.includes(c.tenderType) && c.tenderType && (
+                    <option value={c.tenderType}>{c.tenderType}</option>
+                  )}
+                  {TENDER_TYPE_OPTIONS.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <label className={labelClass}>契約模式</label>
-                <input
-                  type="text"
+                <select
                   className={inputClass}
                   value={c.contractMode || ""}
-                  placeholder="例：統包，總價承攬"
                   onChange={(e) => setField("contractMode", e.target.value)}
-                />
+                >
+                  <option value="">—</option>
+                  {!CONTRACT_MODE_OPTIONS.includes(c.contractMode) && c.contractMode && (
+                    <option value={c.contractMode}>{c.contractMode}</option>
+                  )}
+                  {CONTRACT_MODE_OPTIONS.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className={labelClass}>承攬範圍</label>
@@ -408,6 +446,19 @@ export function InfoPanel({ caseId, c, totalDays }: { caseId: string; c: Case; t
                   className={inputClass}
                   value={c.floorArea || ""}
                   onChange={(e) => setField("floorArea", Number(e.target.value))}
+                />
+                {c.floorArea > 0 && (
+                  <div className="text-[14.5px] text-ink-soft mt-1">約 {formatPing(floorAreaPing)} 坪</div>
+                )}
+              </div>
+              <div>
+                <label className={labelClass}>每坪造價（元/坪）</label>
+                <input
+                  disabled
+                  readOnly
+                  value={costPerPing ? Math.round(costPerPing).toLocaleString() : ""}
+                  placeholder="需先填契約金額與總樓地板面積"
+                  className={inputClass + " text-ink-soft"}
                 />
               </div>
               <div>

@@ -110,7 +110,8 @@ export const cases = pgTable(
     ownerOrg: text("owner_org").notNull().default(""), // 業主
     userUnit: text("user_unit").notNull().default(""), // 使用單位
     location: text("location").notNull().default(""), // 地點
-    contractMode: text("contract_mode").notNull().default(""), // 契約模式（如：統包，總價承攬）
+    tenderType: text("tender_type").notNull().default(""), // 標案形式（統包工程／私人案）
+    contractMode: text("contract_mode").notNull().default(""), // 契約模式（最有利標／最低價）
     contractScope: text("contract_scope").notNull().default(""), // 承攬範圍（如：建築+機電工程+設計）
     supervisorUnit: text("supervisor_unit").notNull().default(""), // 監造單位
     buildingType: text("building_type").notNull().default(""), // 建築形式（棟數／地上地下層數）
