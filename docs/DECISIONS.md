@@ -191,3 +191,83 @@ unfiltered, regardless of caller) rather than adding a new admin-specific endpoi
 exists on that route today, so there was nothing extra to build. Member management is intentionally add+list+
 delete only (no edit-in-place) per the user's "不用其他東西" (nothing else needed) — don't add an edit flow
 unless asked.
+
+## 15. 招標公告／投標截止 are calendar-only time points, never alert/overdue-flagged (finished properly)
+
+**Context**: `derived.ts` already excluded milestone keys `collect`/`deadline` from the *overdue* alert tier
+(`NO_OVERDUE_ALERT_KEYS`) and from the completion-percentage denominator (`isNonCheckableTask`/
+`NON_CHECKABLE_MILESTONES`), per a prior pass. But the user reported (again — "已經改了很多次了") that these two
+still visibly nag: `ProgressPanel`'s milestone card flashed permanently red once the date passed (its own
+`status` calc never checked `isNonCheckableTask`, just `t.done`, which these two can never be), `CalendarView`
+pulsed the day cell "待處理" and flashed the event card `milestoneOverdue` for them, and `urgentTasks()` still
+surfaced them in the 警示提醒 bell whenever they were due "soon" or today (only *overdue* was excluded, not
+upcoming).
+**Decision**: Made `isNonCheckableTask` the single source of truth for "this is a fixed calendar marker, not a
+task" across all four surfaces: `urgentTasks()` now excludes them outright (not just from the overdue tier);
+`ProgressPanel`'s status calc special-cases them to `"done"` (past) / `"normal"` (future) — never
+`"overdue"`/`"soon"`; `CalendarView`'s `alertDates` and `milestoneOverdue` both skip them. The milestone-marker
+*styling itself* (star icon, highlight background, position on the progress bar) is untouched — only the
+overdue/soon/alert treatment is suppressed, since the user explicitly said the marker behavior itself was
+correct and shouldn't change.
+**Consequence**: `NO_OVERDUE_ALERT_KEYS` in `derived.ts` now only needs `eval_presentation_day` (a different,
+checkable milestone that just shouldn't sit in the overdue tier forever) — `collect`/`deadline` are handled
+entirely through `isNonCheckableTask` instead. If a future milestone needs this same "calendar point, not a
+task" treatment, add its key to `NON_CHECKABLE_MILESTONES`, not to four separate places.
+
+## 16. Consultant roster: default (non-custom) rows are now editable/deletable too
+
+**Context**: `TeamPanel`'s "專業顧問明細" table gated the role-name `<input>` and the delete button behind
+`row.custom` — so the 13 seeded default consultant roles (`CONSULTANT_DEFAULTS`, `custom: false`) could only
+have their company/contact filled in, never renamed or removed. The user's request ("新增後不能編輯，請幫我新增
+編輯功能，可以編輯跟刪除") was about the roster in general, not specifically the user-added rows (which already
+supported this).
+**Decision**: Removed the `row.custom` gate on both the role-name input and the delete button — every row is
+now editable and deletable, regardless of origin.
+**Follow-on problem found while testing**: `normalizeTeam` (called on every case open, not just creation)
+backfills any `CONSULTANT_DEFAULTS` role missing from `team.consultants` by exact role-string match. Once
+deletion was unlocked, this silently resurrected any deleted default the next time the case was opened —
+deletion looked broken. Fixed by only running that backfill when `team.consultants.length === 0` (brand-new
+case, or a case with every consultant removed) instead of per-missing-role — a new case still gets all 13
+defaults seeded once, but a deliberate deletion now actually sticks.
+
+## 17. Removed 連結任務 (linked-task) creation UI from ListView's task rows
+
+**Context**: The user asked to remove the 連結任務 feature from the task list. The underlying data (`Task.
+linkedTaskId`/`linkOffsetDays`) and its read-side behavior — `resolveLinkedTaskDates` in `derived.ts`,
+`CalendarView`'s drag-disable, `EventDetailModal`'s disabled/auto-following date field — are still in the schema
+and still apply to any task that already has a link set.
+**Decision**: Removed only the `<select>`/offset-input UI block from `ListView.tsx`'s `TaskRow` (the sole place
+that could *create* a link). Left every other linked-task-aware code path alone, since it's not dead — it's
+still the correct behavior for whatever data already carries a `linkedTaskId`, and ripping out the schema field
+or the read-side logic wasn't asked for and isn't safe without a data migration.
+**Consequence**: No UI anywhere can create a new task link going forward. If the feature needs to come back, it
+was `ListView.tsx` (removed) — `EventDetailModal.tsx` was never a place you could set the link, only see it.
+
+## 18. Dual view (兩者檢視) stacks vertically below `lg`, checklist panel gained checkboxes
+
+**Context**: While doing a responsive pass, found the "兩者檢視" mode's calendar+list side-by-side layout
+(`w-4/5`/`w-1/5`) squeezed `SimpleTaskList` into an unreadable ~70px-wide column on phone-width screens — CJK
+text with no `whitespace-nowrap` wrapped to one character per line under that pressure (same underlying bug as
+decision below on the schedule-toggle buttons and `ListView`'s category headings).
+**Decision**: `flex-col lg:flex-row` on the wrapping div — calendar full-width on top, checklist full-width
+below, only side-by-side at `lg:` (1024px+) where a 20% column is actually wide enough. Separately, per the
+user's request, added a checkbox to each `SimpleTaskList` item (previously text-only, done-state only showed as
+strikethrough) — needed passing `caseId` down to it so it can call `updateCase`.
+**Related fix, same root cause**: `ListView.tsx`'s per-category heading row and the schedule view-toggle buttons
+in `CaseView.tsx` had the identical CJK-flex-shrink bug (visible as a heading or button label wrapping into a
+vertical stack of single characters on a phone-width viewport). Fixed by adding `whitespace-nowrap` to the text
+and `flex-wrap` to the row (heading case — the whole heading now wraps as a unit instead of compressing
+internally) or by hiding the label below `sm:` and keeping icon+`title` tooltip only (toggle buttons — three
+full-width segmented-control labels don't fit a phone screen even on one line each).
+**General takeaway**: any CJK text living directly inside a `flex` item without `whitespace-nowrap` is at risk
+of this — browsers treat CJK line-break opportunities as between-every-character by default, so flex-shrink's
+`min-width: auto` doesn't protect it the way it would for Latin text with spaces.
+
+## 19. Schedule-view font sizes reduced ~15% (`ListView`/`CalendarView`/`SimpleTaskList`)
+
+**Context**: User asked to shrink the 時程管理 (schedule) section's text further ("再幫我縮小15%") — a follow-up
+tightening of density, not a new design direction.
+**Decision**: Multiplied every `text-[Npx]` value in `ListView.tsx`, `CalendarView.tsx`, and `SimpleTaskList.tsx`
+by ~0.85 (rounded to a sane `.5`-ish step), left icon `size={}` props alone (the ask was about font, not icon
+scale) and left `SectionLabel`'s "時程管理 · SCHEDULE" heading alone (shared across all three section headers,
+not schedule-specific content).

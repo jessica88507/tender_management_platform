@@ -4,6 +4,7 @@ import { Fragment, useState } from "react";
 import { MapPin, Plus, Star, Warning } from "@phosphor-icons/react";
 import { Case, Task } from "@/lib/types";
 import { useApp } from "@/context/AppContext";
+import { isNonCheckableTask } from "@/lib/derived";
 import { CATEGORIES, catColor, catLetter } from "@/lib/constants";
 import { catIconComponent } from "@/lib/categoryIcons";
 import { addDays, toISO, uid } from "@/lib/date";
@@ -58,6 +59,9 @@ export function CalendarView({ caseId, c }: { caseId: string; c: Case }) {
   const alertDates = new Set<string>();
   c.tasks.forEach((t) => {
     if (t.done) return;
+    // 招標公告／投標截止 are fixed calendar time points, not action items — don't pulse the day
+    // cell as "待處理" for them.
+    if (isNonCheckableTask(t)) return;
     const due = new Date(t.due + "T00:00:00");
     if (due <= soon) alertDates.add(t.due);
   });
@@ -118,7 +122,7 @@ export function CalendarView({ caseId, c }: { caseId: string; c: Case }) {
 
   return (
     <div>
-      <div className="flex flex-wrap gap-3 mb-3.5 text-[16px] text-ink-soft">
+      <div className="flex flex-wrap gap-3 mb-3.5 text-[13.5px] text-ink-soft">
         {CATEGORIES.map((cat) => {
           const CatIcon = catIconComponent(cat);
           return (
@@ -136,20 +140,20 @@ export function CalendarView({ caseId, c }: { caseId: string; c: Case }) {
       </div>
 
       <div className="overflow-x-auto mb-1.5 rounded-lg border border-border shadow-sm">
-      <table className="w-full min-w-[880px] border-collapse text-[15.5px]">
+      <table className="w-full min-w-[880px] border-collapse text-[13px]">
         <tbody>
           {weeks.map((week) => (
             <Fragment key={week.weekKey}>
               {week.monthLabel && (
                 <>
                   <tr>
-                    <td colSpan={8} className="bg-highlight-soft font-serif font-bold text-[22px] text-center py-2.5 tracking-[0.2em] border border-border">
+                    <td colSpan={8} className="bg-highlight-soft font-serif font-bold text-[18.5px] text-center py-2.5 tracking-[0.2em] border border-border">
                       {week.monthLabel}
                     </td>
                   </tr>
                   <tr>
                     {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "本週目標／備注"].map((label) => (
-                      <th key={label} className="bg-muted text-[16px] py-2 px-0.5 font-bold text-ink-soft border border-border">
+                      <th key={label} className="bg-muted text-[13.5px] py-2 px-0.5 font-bold text-ink-soft border border-border">
                         {label}
                       </th>
                     ))}
@@ -198,7 +202,7 @@ export function CalendarView({ caseId, c }: { caseId: string; c: Case }) {
                     >
                       <div
                         className={
-                          "font-mono text-[17.5px] font-bold mb-1 flex justify-between items-center " +
+                          "font-mono text-[15px] font-bold mb-1 flex justify-between items-center " +
                           (isWeekend ? "text-weekend-red " : "text-ink-soft ") +
                           (isToday ? "!text-done-green font-extrabold" : "")
                         }
@@ -222,13 +226,13 @@ export function CalendarView({ caseId, c }: { caseId: string; c: Case }) {
                         )}
                       </div>
                       {hasAlert && (
-                        <div className="text-[11.5px] text-primary font-bold mb-0.5 flex items-center gap-0.5">
+                        <div className="text-[10px] text-primary font-bold mb-0.5 flex items-center gap-0.5">
                           <Warning weight="fill" size={9} />
                           待處理
                         </div>
                       )}
                       {visibleTasks.map((t) => {
-                        const milestoneOverdue = !!t.milestone && !t.done && t.due < todayISO;
+                        const milestoneOverdue = !!t.milestone && !t.done && t.due < todayISO && !isNonCheckableTask(t);
                         return (
                         <div
                           key={t.id}
@@ -247,7 +251,7 @@ export function CalendarView({ caseId, c }: { caseId: string; c: Case }) {
                           title={t.linkedTaskId ? "已連結任務，日期會自動跟隨（無法拖曳）" : t.owner || ""}
                           style={{ ["--cat-color" as string]: catColor(t.cat) }}
                           className={
-                            "text-[15.5px] leading-[1.4] py-1 px-1.5 mb-0.5 rounded-md bg-black/5 border-l-[3px] [border-left-color:var(--cat-color)] flex items-center gap-1 cursor-pointer transition-[filter,box-shadow] hover:brightness-95 hover:shadow-[0_1px_3px_rgba(0,0,0,0.12)] " +
+                            "text-[13px] leading-[1.4] py-1 px-1.5 mb-0.5 rounded-md bg-black/5 border-l-[3px] [border-left-color:var(--cat-color)] flex items-center gap-1 cursor-pointer transition-[filter,box-shadow] hover:brightness-95 hover:shadow-[0_1px_3px_rgba(0,0,0,0.12)] " +
                             (t.done ? "opacity-45 line-through " : "") +
                             (t.milestone ? "!bg-highlight-soft !border-l-highlight font-bold shadow-[0_0_0_1px_inset_var(--color-highlight)] " : "") +
                             (milestoneOverdue
@@ -267,7 +271,7 @@ export function CalendarView({ caseId, c }: { caseId: string; c: Case }) {
                             e.stopPropagation();
                             toggleExpand(iso);
                           }}
-                          className="block w-full text-center bg-transparent border border-dashed border-border rounded text-accent text-[13px] py-0 px-1 cursor-pointer mt-0.5 hover:bg-accent/10 hover:border-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
+                          className="block w-full text-center bg-transparent border border-dashed border-border rounded text-accent text-[11px] py-0 px-1 cursor-pointer mt-0.5 hover:bg-accent/10 hover:border-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
                         >
                           +{hiddenCount} 展開
                         </button>
@@ -278,7 +282,7 @@ export function CalendarView({ caseId, c }: { caseId: string; c: Case }) {
                             e.stopPropagation();
                             toggleExpand(iso);
                           }}
-                          className="block w-full text-center bg-transparent border border-dashed border-border rounded text-accent text-[13px] py-0 px-1 cursor-pointer mt-0.5 hover:bg-accent/10 hover:border-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
+                          className="block w-full text-center bg-transparent border border-dashed border-border rounded text-accent text-[11px] py-0 px-1 cursor-pointer mt-0.5 hover:bg-accent/10 hover:border-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
                         >
                           收合
                         </button>
@@ -291,7 +295,7 @@ export function CalendarView({ caseId, c }: { caseId: string; c: Case }) {
                     value={c.weekNotes[week.weekKey] || ""}
                     disabled={!canEditActive}
                     onChange={(e) => setWeekNote(week.weekKey, e.target.value)}
-                    className="w-full h-full min-h-[72px] border-none bg-transparent text-[14.5px] resize-none p-1 text-ink-soft focus:outline-none focus:[outline:1px_dashed_var(--color-highlight)] disabled:cursor-not-allowed"
+                    className="w-full h-full min-h-[72px] border-none bg-transparent text-[12.5px] resize-none p-1 text-ink-soft focus:outline-none focus:[outline:1px_dashed_var(--color-highlight)] disabled:cursor-not-allowed"
                   />
                 </td>
               </tr>
@@ -301,7 +305,7 @@ export function CalendarView({ caseId, c }: { caseId: string; c: Case }) {
       </table>
       </div>
 
-      <div className="text-[15.5px] text-ink-soft mt-2.5 font-mono">
+      <div className="text-[13px] text-ink-soft mt-2.5 font-mono">
         提示：點日期格右上角「＋」可直接新增事件；點選事件卡片可檢視詳情；拖曳事件卡片到其他日期即可改期，會自動同步回任務清單／整體進度上的大事記標記。淺色網底的日期表示已超出統包啟動會議～施工評選簡報日的範圍（之後仍保留至投標截止後1個月供評選作業使用）。
       </div>
 

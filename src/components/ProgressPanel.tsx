@@ -3,7 +3,7 @@
 import { ChartBar } from "@phosphor-icons/react";
 import { Case } from "@/lib/types";
 import { MILESTONE_ORDER } from "@/lib/constants";
-import { caseProgress } from "@/lib/derived";
+import { caseProgress, isNonCheckableTask } from "@/lib/derived";
 import { daysBetween } from "@/lib/date";
 
 const MILESTONE_SOON_DAYS = 5;
@@ -70,7 +70,20 @@ export function ProgressPanel({ c, onJump }: { c: Case; onJump: (taskId: string)
     .map((t) => {
       const due = new Date(t.due + "T00:00:00");
       const daysLeft = daysBetween(today, due);
-      const status = t.done ? "done" : daysLeft < 0 ? "overdue" : daysLeft <= MILESTONE_SOON_DAYS ? "soon" : "normal";
+      // 招標公告／投標截止 are fixed calendar time points, not action items — they can never be
+      // "done", so treating them like normal milestones would leave them flashing "overdue"
+      // forever once the date passes. Just fade them once past, never flag as overdue/soon.
+      const status = isNonCheckableTask(t)
+        ? daysLeft < 0
+          ? "done"
+          : "normal"
+        : t.done
+        ? "done"
+        : daysLeft < 0
+        ? "overdue"
+        : daysLeft <= MILESTONE_SOON_DAYS
+        ? "soon"
+        : "normal";
       const label = MILESTONE_ORDER.find((m) => m.key === t.milestone)?.label || t.label;
       return { id: t.id, label, due: t.due, status };
     })

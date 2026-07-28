@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { DotsSixVertical, LinkSimple, Plus, Star, Trash } from "@phosphor-icons/react";
+import { DotsSixVertical, Plus, Star, Trash } from "@phosphor-icons/react";
 import { Case, Task } from "@/lib/types";
 import { useApp } from "@/context/AppContext";
 import { CATEGORIES, catColor, catLetter } from "@/lib/constants";
@@ -14,7 +14,6 @@ function TaskRow({ caseId, t, c, index }: { caseId: string; t: Task; c: Case; in
   const { updateCase, canEditActive } = useApp();
   const ownerOptions = getOwnerOptions(c);
   if (t.owner && !ownerOptions.includes(t.owner)) ownerOptions.push(t.owner);
-  const linkOptions = c.tasks.filter((x) => x.id !== t.id);
 
   const patchTask = (patch: Partial<Task>) => {
     updateCase(caseId, (draft) => {
@@ -39,7 +38,7 @@ function TaskRow({ caseId, t, c, index }: { caseId: string; t: Task; c: Case; in
       }
       style={{ ["--cat-color" as string]: catColor(t.cat) }}
     >
-      <span className="w-8 shrink-0 text-right font-mono text-[16px] text-ink-soft">{index}</span>
+      <span className="w-8 shrink-0 text-right font-mono text-[13.5px] text-ink-soft">{index}</span>
       <input
         type="checkbox"
         checked={t.done}
@@ -65,7 +64,7 @@ function TaskRow({ caseId, t, c, index }: { caseId: string; t: Task; c: Case; in
         disabled={!canEditActive}
         onChange={(e) => patchTask({ label: e.target.value })}
         className={
-          "flex-[2] min-w-0 text-[21.5px] border-none bg-transparent text-ink py-1 px-1 focus:outline-none focus:[outline:1px_dashed_var(--color-highlight)] rounded-sm disabled:cursor-not-allowed " +
+          "flex-[2] min-w-0 text-[18px] border-none bg-transparent text-ink py-1 px-1 focus:outline-none focus:[outline:1px_dashed_var(--color-highlight)] rounded-sm disabled:cursor-not-allowed " +
           (t.done ? "line-through text-done-green" : "")
         }
       />
@@ -75,13 +74,13 @@ function TaskRow({ caseId, t, c, index }: { caseId: string; t: Task; c: Case; in
         placeholder="說明"
         disabled={!canEditActive}
         onChange={(e) => patchTask({ note: e.target.value })}
-        className="flex-1 min-w-0 text-[18px] border-none bg-transparent text-ink-soft py-1 px-1 focus:outline-none focus:[outline:1px_dashed_var(--color-highlight)] rounded-sm disabled:cursor-not-allowed"
+        className="flex-1 min-w-0 text-[15.5px] border-none bg-transparent text-ink-soft py-1 px-1 focus:outline-none focus:[outline:1px_dashed_var(--color-highlight)] rounded-sm disabled:cursor-not-allowed"
       />
       <select
         value={t.owner}
         disabled={!canEditActive}
         onChange={(e) => patchTask({ owner: e.target.value })}
-        className="w-[145px] shrink-0 text-[18px] border border-transparent bg-transparent text-ink-soft py-1 px-1 rounded focus:border-border focus:bg-card focus:outline-none disabled:cursor-not-allowed"
+        className="w-[145px] shrink-0 text-[15.5px] border border-transparent bg-transparent text-ink-soft py-1 px-1 rounded focus:border-border focus:bg-card focus:outline-none disabled:cursor-not-allowed"
       >
         <option value="">— 未指定</option>
         {ownerOptions.map((o) => (
@@ -90,45 +89,14 @@ function TaskRow({ caseId, t, c, index }: { caseId: string; t: Task; c: Case; in
           </option>
         ))}
       </select>
-      <div className="flex items-center gap-1 shrink-0" title="連結任務：日期會自動跟隨所選任務">
-        <LinkSimple weight="bold" size={13} className={t.linkedTaskId ? "text-accent" : "text-border"} />
-        <select
-          value={t.linkedTaskId || ""}
-          disabled={!canEditActive}
-          onChange={(e) => {
-            const val = e.target.value;
-            patchTask(val ? { linkedTaskId: val, linkOffsetDays: t.linkOffsetDays ?? 0 } : { linkedTaskId: null, linkOffsetDays: null });
-          }}
-          className="w-[110px] text-[15px] border border-transparent bg-transparent text-ink-soft py-1 px-1 rounded focus:border-border focus:bg-card focus:outline-none disabled:cursor-not-allowed"
-        >
-          <option value="">— 不連結</option>
-          {linkOptions.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-        {t.linkedTaskId && (
-          <>
-            <input
-              type="number"
-              value={t.linkOffsetDays ?? 0}
-              disabled={!canEditActive}
-              onChange={(e) => patchTask({ linkOffsetDays: Number(e.target.value) })}
-              className="w-11 text-[15px] font-mono border border-border rounded py-1 px-1 bg-card text-ink-soft focus:outline-none focus:border-accent disabled:cursor-not-allowed"
-            />
-            <span className="text-[14px] text-ink-soft">天</span>
-          </>
-        )}
-      </div>
-      <span className="font-mono text-[17px] text-ink-soft">{fmtWeekday(t.due)}</span>
+      <span className="font-mono text-[14.5px] text-ink-soft">{fmtWeekday(t.due)}</span>
       <input
         type="date"
         value={t.due}
         disabled={!canEditActive || !!t.linkedTaskId}
         title={t.linkedTaskId ? "已連結任務，日期會自動跟隨" : undefined}
         onChange={(e) => patchTask({ due: e.target.value })}
-        className="font-mono text-[18px] font-semibold border border-transparent bg-transparent text-ink-soft py-1 px-1 rounded w-[172px] shrink-0 focus:border-border focus:bg-card focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+        className="font-mono text-[15.5px] font-semibold border border-transparent bg-transparent text-ink-soft py-1 px-1 rounded w-[172px] shrink-0 focus:border-border focus:bg-card focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
       />
       {canEditActive && (
         <button title="刪除" onClick={removeTask} className="text-border hover:text-danger cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-danger shrink-0 py-0.5 px-1.5">
@@ -214,7 +182,7 @@ export function ListView({ caseId, c }: { caseId: string; c: Case }) {
               setDragOverCat(null);
             }}
           >
-            <div className="flex items-baseline gap-2.5 border-b-2 [border-bottom-color:var(--cat-color)] pb-1.5 mb-2.5">
+            <div className="flex flex-wrap items-baseline gap-2.5 border-b-2 [border-bottom-color:var(--cat-color)] pb-1.5 mb-2.5">
               {canEditActive && (
                 <span className="cursor-grab active:cursor-grabbing text-ink-soft/50 hover:text-ink-soft shrink-0" title="拖曳整個分類調整順序">
                   <DotsSixVertical weight="bold" size={16} />
@@ -222,16 +190,19 @@ export function ListView({ caseId, c }: { caseId: string; c: Case }) {
               )}
               {isKnownCat && (
                 <span
-                  className="font-mono text-[19px] font-bold rounded [color:var(--cat-color)] border-2 [border-color:var(--cat-color)] py-0 px-2"
+                  className="font-mono text-[16px] font-bold rounded [color:var(--cat-color)] border-2 [border-color:var(--cat-color)] py-0 px-2 shrink-0"
                 >
                   {catLetter(cat)}
                 </span>
               )}
-              <h3 className="font-serif text-[27.5px] font-bold m-0 [color:var(--cat-color)] flex items-center gap-1.5">
+              {/* whitespace-nowrap: CJK text has no spaces, so a flex item without it can shrink
+                  to a single character wide and wrap vertically under width pressure — the
+                  flex-wrap on this row means the whole heading drops to its own line instead. */}
+              <h3 className="font-serif text-[23.5px] font-bold m-0 [color:var(--cat-color)] flex items-center gap-1.5 whitespace-nowrap">
                 <CatIcon weight="bold" size={19} />
                 {cat}
               </h3>
-              <span className="font-mono text-[16px] text-ink-soft">
+              <span className="font-mono text-[13.5px] text-ink-soft whitespace-nowrap">
                 {doneInCat}/{tasks.length}
               </span>
             </div>
@@ -243,7 +214,7 @@ export function ListView({ caseId, c }: { caseId: string; c: Case }) {
             {canEditActive && (
               <button
                 onClick={() => addTask(cat)}
-                className="bg-transparent border-none text-accent text-[17.5px] font-bold cursor-pointer py-1.5 px-1 hover:underline flex items-center gap-1"
+                className="bg-transparent border-none text-accent text-[15px] font-bold cursor-pointer py-1.5 px-1 hover:underline flex items-center gap-1"
               >
                 <Plus weight="bold" size={13} />
                 新增項目

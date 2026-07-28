@@ -108,48 +108,57 @@ export function CaseView({ caseId, caseData }: { caseId: string; caseData: Case 
       <section className="animate-[fadeInUp_0.4s_ease-out]" style={{ animationDelay: "0.1s", animationFillMode: "backwards" }}>
         <SectionLabel>時程管理 · Schedule</SectionLabel>
         <div className="bg-card border border-border rounded-lg p-5 shadow-sm">
+          {/* whitespace-nowrap: CJK text has no spaces, so without it these labels can shrink to
+              a single character wide and wrap into a vertical stack under width pressure. Label
+              text hides below sm (icon-only, title tooltip carries the label) since even at the
+              15%-smaller size, all three full labels don't fit a phone-width row. */}
           <div className="flex mb-5.5 border border-ink rounded-md overflow-hidden w-fit" data-tutorial="schedule-toggle">
             <button
               onClick={() => setViewMode("cal")}
+              title="行事曆檢視"
               className={
-                "py-2.5 px-5 text-[19px] font-bold cursor-pointer border-r border-ink flex items-center gap-1.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary " +
+                "py-2 px-3 sm:px-4 text-[16px] font-bold cursor-pointer border-r border-ink flex items-center gap-1.5 whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary " +
                 (ui.viewMode === "cal" ? "bg-ink text-card" : "bg-card text-ink-soft hover:bg-muted")
               }
             >
-              <CalendarBlank weight="bold" size={16} />
-              行事曆檢視
+              <CalendarBlank weight="bold" size={14} />
+              <span className="hidden sm:inline">行事曆檢視</span>
             </button>
             <button
               onClick={() => setViewMode("list")}
+              title="任務清單"
               className={
-                "py-2.5 px-5 text-[19px] font-bold cursor-pointer border-r border-ink flex items-center gap-1.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary " +
+                "py-2 px-3 sm:px-4 text-[16px] font-bold cursor-pointer border-r border-ink flex items-center gap-1.5 whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary " +
                 (ui.viewMode === "list" ? "bg-ink text-card" : "bg-card text-ink-soft hover:bg-muted")
               }
             >
-              <ListChecks weight="bold" size={16} />
-              任務清單
+              <ListChecks weight="bold" size={14} />
+              <span className="hidden sm:inline">任務清單</span>
             </button>
             <button
               onClick={() => setViewMode("both")}
+              title="兩者檢視"
               className={
-                "py-2.5 px-5 text-[19px] font-bold cursor-pointer flex items-center gap-1.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary " +
+                "py-2 px-3 sm:px-4 text-[16px] font-bold cursor-pointer flex items-center gap-1.5 whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary " +
                 (ui.viewMode === "both" ? "bg-ink text-card" : "bg-card text-ink-soft hover:bg-muted")
               }
             >
-              <Columns weight="bold" size={16} />
-              兩者檢視
+              <Columns weight="bold" size={14} />
+              <span className="hidden sm:inline">兩者檢視</span>
             </button>
           </div>
 
           {ui.viewMode === "list" ? (
             <ListView caseId={caseId} c={c} />
           ) : ui.viewMode === "both" ? (
-            <div className="flex gap-4 items-start">
-              <div className="w-4/5 min-w-0">
+            // Side-by-side only at lg+ — below that, a 1/5-width column leaves no room for
+            // readable CJK task labels (they'd otherwise compress to one character per line).
+            <div className="flex flex-col lg:flex-row gap-4 items-start">
+              <div className="w-full lg:w-4/5 min-w-0">
                 <CalendarView caseId={caseId} c={c} />
               </div>
-              <div className="w-1/5 min-w-0 shrink-0 max-h-[900px] overflow-y-auto border-l border-border pl-3.5">
-                <SimpleTaskList c={c} />
+              <div className="w-full lg:w-1/5 min-w-0 lg:shrink-0 max-h-[400px] lg:max-h-[900px] overflow-y-auto border-t lg:border-t-0 lg:border-l border-border pt-3 lg:pt-0 lg:pl-3.5">
+                <SimpleTaskList caseId={caseId} c={c} />
               </div>
             </div>
           ) : (

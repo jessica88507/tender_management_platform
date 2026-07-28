@@ -326,16 +326,12 @@ export function TeamPanel({ caseId, c }: { caseId: string; c: Case }) {
                   {c.team.consultants.map((row, idx) => (
                     <tr key={row.id}>
                       <td className="font-bold text-ink whitespace-nowrap border-b border-dashed border-border py-1 px-1.5">
-                        {row.custom ? (
-                          <input
-                            type="text"
-                            value={row.role}
-                            onChange={(e) => setConsultantField(idx, "role", e.target.value)}
-                            className={tableInputClass}
-                          />
-                        ) : (
-                          row.role
-                        )}
+                        <input
+                          type="text"
+                          value={row.role}
+                          onChange={(e) => setConsultantField(idx, "role", e.target.value)}
+                          className={tableInputClass}
+                        />
                       </td>
                       <td className="border-b border-dashed border-border py-1 px-1.5">
                         <input
@@ -361,11 +357,9 @@ export function TeamPanel({ caseId, c }: { caseId: string; c: Case }) {
                         </span>
                       </td>
                       <td className="border-b border-dashed border-border py-1 px-1.5">
-                        {row.custom && (
-                          <button title="刪除" onClick={() => removeConsultant(idx)} className="text-border hover:text-danger cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-danger">
-                            <X size={14} />
-                          </button>
-                        )}
+                        <button title="刪除" onClick={() => removeConsultant(idx)} className="text-border hover:text-danger cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-danger">
+                          <X size={14} />
+                        </button>
                       </td>
                     </tr>
                   ))}

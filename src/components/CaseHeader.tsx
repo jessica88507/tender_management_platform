@@ -22,7 +22,9 @@ export function CaseHeader({
       <div className="flex flex-wrap justify-between items-start gap-4">
         <div className="flex-1 min-w-[220px]">
           {!isCaseOwner && (
-            <div className="flex items-center gap-1.5 text-[15px] font-bold text-danger mb-1.5 bg-danger-soft border border-danger rounded py-1 px-2 w-fit">
+            // mr-14 keeps this clear of the fixed 警示提醒 bell (top-20 right-4.5 in AlertBanner)
+            // on narrow viewports, where this banner otherwise runs edge-to-edge right under it.
+            <div className="flex items-center gap-1.5 text-[15px] font-bold text-danger mb-1.5 bg-danger-soft border border-danger rounded py-1 px-2 w-fit mr-14 sm:mr-0">
               <Warning weight="fill" size={14} />
               你並非本案主投標手（{c.bidLead || "尚未指定"}）・修改前系統會再次確認
             </div>

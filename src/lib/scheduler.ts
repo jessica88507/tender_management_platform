@@ -21,11 +21,15 @@ export function normalizeTeam(team: Partial<Team> | undefined): Team {
           }
     ),
   };
-  CONSULTANT_DEFAULTS.forEach((role) => {
-    if (!t.consultants.some((x) => x.role === role)) {
+  // Only seed the 13 default roles when the team has no consultants at all (brand-new case, or a
+  // case that's had every consultant removed) — this runs on every case open (see CaseView.tsx),
+  // so backfilling by role-name match whenever one's "missing" would silently resurrect any
+  // default the user deliberately deleted, making delete look broken.
+  if (t.consultants.length === 0) {
+    CONSULTANT_DEFAULTS.forEach((role) => {
       t.consultants.push({ id: uid(), role, company: "", contact: "", affiliation: "", custom: false, team: null });
-    }
-  });
+    });
+  }
   return t;
 }
 
