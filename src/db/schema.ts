@@ -26,6 +26,9 @@ export const userRoleEnum = pgEnum("user_role", ["member", "admin"]);
 export const users = pgTable("users", {
   id: uuid(),
   name: text("name"),
+  // Login identifier. `email` is kept only for legacy rows / future SSO — login now goes through
+  // `username`, a plain account name (see auth.ts's authorize()).
+  username: text("username").unique(),
   email: text("email").unique(),
   emailVerified: timestamp("email_verified", { mode: "date" }),
   image: text("image"),
@@ -134,13 +137,26 @@ export const tasks = pgTable(
       .notNull()
       .references(() => cases.id, { onDelete: "cascade" }),
 
+    // Template key the task was generated from (see src/lib/taskTemplates.ts) — lets a
+    // non-destructive regenerate match old vs. new tasks without relying on label text.
+    key: text("key"),
     cat: text("cat").notNull(),
     label: text("label").notNull(),
     note: text("note").notNull().default(""),
     owner: text("owner").notNull().default(""),
     due: date("due", { mode: "string" }).notNull(),
+    // Last value the scheduling engine computed for `due`; diverges from `due` once a user
+    // manually moves the task, which is how regenerate knows to leave it alone.
+    autoDue: date("auto_due", { mode: "string" }),
     done: boolean("done").notNull().default(false),
     milestone: text("milestone"),
+
+    // Manual task-to-task link (see ListView.tsx's 連結任務 dropdown): this task's due date
+    // follows `linkedTaskId`'s due date + linkOffsetDays whenever the target moves. Plain text,
+    // no FK — the tasks table is wholesale deleted/reinserted per case save, so a hard FK would
+    // fight that; a dangling id (target since deleted) is just treated as "no link" client-side.
+    linkedTaskId: text("linked_task_id"),
+    linkOffsetDays: integer("link_offset_days"),
 
     // Optional per-task Outlook calendar sync (see project spec item 5)
     syncToOutlook: boolean("sync_to_outlook").notNull().default(false),
@@ -153,6 +169,33 @@ export const tasks = pgTable(
   },
   (t) => [index("tasks_case_id_idx").on(t.caseId), index("tasks_case_id_due_idx").on(t.caseId, t.due)]
 );
+
+// 預設排程規則（超級管理員可調整）— global, not per-case. Mirrors src/lib/taskTemplates.ts's
+// TaskTemplateRow shape; DEFAULT_TASK_TEMPLATES there is the fallback/seed source, this table is
+// what the admin UI actually edits and what generateTasks() is called with at runtime.
+export const taskTemplateKindEnum = pgEnum("task_template_kind", ["fixed", "ratio", "special"]);
+export const taskTemplateAnchorEnum = pgEnum("task_template_anchor", ["start", "workStart", "deadline"]);
+
+export const taskTemplates = pgTable("task_templates", {
+  id: uuid(),
+  key: text("key").notNull().unique(),
+  sortIndex: integer("sort_index").notNull().default(0),
+  category: text("category").notNull(),
+  label: text("label").notNull(),
+  owner: text("owner").notNull().default(""),
+  enabled: boolean("enabled").notNull().default(true),
+  kind: taskTemplateKindEnum("kind").notNull(),
+  anchor: taskTemplateAnchorEnum("anchor"),
+  // Parent-task anchor (takes precedence over `anchor` when set) — lets a rule follow another
+  // template's computed date instead of only the 3 case-level anchors. See taskTemplates.ts.
+  anchorTaskKey: text("anchor_task_key"),
+  offsetDays: integer("offset_days"),
+  ratioPct: doublePrecision("ratio_pct"),
+  snap: boolean("snap").notNull().default(true),
+  milestone: text("milestone"),
+  note: text("note").notNull().default(""),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
 
 // 建築師 / 機電團隊 simple name lists (per case)
 export const teamMembers = pgTable(

@@ -15,9 +15,9 @@ export function Header({
   return (
     <header className="sticky top-0 z-40 flex items-center justify-between gap-3 h-16 shrink-0 px-4 sm:px-6 bg-card border-b-2 border-ink overflow-hidden">
       <div className="font-serif font-black text-[23.5px] sm:text-[26px] tracking-wide flex items-baseline gap-2 min-w-0 shrink-0">
-        <span className="whitespace-nowrap">備標控台</span>
+        <span className="whitespace-nowrap">業務投標管理平台</span>
         <span className="hidden md:inline font-mono text-[13px] font-semibold text-ink-soft tracking-[0.2em] whitespace-nowrap">
-          BID PREP CONTROL
+          BIGMASTER
         </span>
       </div>
 

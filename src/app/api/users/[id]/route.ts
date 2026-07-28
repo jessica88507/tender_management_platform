@@ -16,39 +16,39 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const body = (await request.json()) as {
     name?: string;
-    email?: string;
+    username?: string;
     password?: string;
     department?: string;
   };
 
   const name = body.name?.trim() || "";
-  const email = body.email?.trim().toLowerCase() || "";
+  const username = body.username?.trim() || "";
   const department = body.department?.trim() || "";
   const password = body.password || "";
 
-  if (!name || !email) {
-    return NextResponse.json({ error: "姓名、電子郵件皆為必填" }, { status: 400 });
+  if (!name || !username) {
+    return NextResponse.json({ error: "姓名、帳號皆為必填" }, { status: 400 });
   }
   if (password && password.length < 6) {
     return NextResponse.json({ error: "密碼至少需 6 個字元" }, { status: 400 });
   }
 
-  const emailTaken = await db.query.users.findFirst({ where: and(eq(users.email, email), ne(users.id, id)) });
-  if (emailTaken) {
-    return NextResponse.json({ error: "此電子郵件已被使用" }, { status: 409 });
+  const usernameTaken = await db.query.users.findFirst({ where: and(eq(users.username, username), ne(users.id, id)) });
+  if (usernameTaken) {
+    return NextResponse.json({ error: "此帳號已被使用" }, { status: 409 });
   }
 
   const [updated] = await db
     .update(users)
     .set({
       name,
-      email,
+      username,
       department,
       ...(password ? { passwordHash: await bcrypt.hash(password, 10) } : {}),
       updatedAt: new Date(),
     })
     .where(eq(users.id, id))
-    .returning({ id: users.id, name: users.name, email: users.email, department: users.department, role: users.role, createdAt: users.createdAt });
+    .returning({ id: users.id, name: users.name, username: users.username, department: users.department, role: users.role, createdAt: users.createdAt });
 
   return NextResponse.json({ user: updated });
 }

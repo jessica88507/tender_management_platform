@@ -73,8 +73,23 @@ function AppShell({
   );
 }
 
+const THEME_KEY = "bid-scheduler-theme";
+
 export default function ClientApp() {
   const { data: session, status } = useSession();
+
+  useEffect(() => {
+    if (status === "loading") return;
+    // The blocking init script (see layout.tsx) always starts the page on light, since it runs
+    // before we know whether anyone's signed in. Once the session check resolves, apply the
+    // signed-in user's own saved preference — or fall back to light on the login screen itself.
+    try {
+      const saved = session ? window.localStorage.getItem(THEME_KEY) : null;
+      document.documentElement.setAttribute("data-theme", saved === "dark" ? "dark" : "light");
+    } catch {
+      // localStorage unavailable — the initial light default from layout.tsx just stays as-is
+    }
+  }, [status, session]);
 
   if (status === "loading") {
     return <div className="min-h-screen flex items-center justify-center bg-background text-ink-soft text-[18px]">載入中…</div>;

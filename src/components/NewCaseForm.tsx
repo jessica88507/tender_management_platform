@@ -13,7 +13,7 @@ export function NewCaseForm({ showEmptyState }: { showEmptyState: boolean }) {
   const { customAlert } = useConfirm();
   const todayStr = toISO(new Date());
   const [name, setName] = useState("");
-  const [start, setStart] = useState(todayStr);
+  const [workStart, setWorkStart] = useState(todayStr);
   const [deadline, setDeadline] = useState("");
 
   const handleCreate = async () => {
@@ -21,7 +21,7 @@ export function NewCaseForm({ showEmptyState }: { showEmptyState: boolean }) {
       await customAlert("請輸入投標截止日期與時間");
       return;
     }
-    createCase({ name: name.trim() || "未命名案件", start: start || todayStr, deadline });
+    createCase({ name: name.trim() || "未命名案件", workStart: workStart || todayStr, deadline });
   };
 
   return (
@@ -44,7 +44,7 @@ export function NewCaseForm({ showEmptyState }: { showEmptyState: boolean }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           <div>
             <label className={labelClass}>開始作業期程</label>
-            <input type="date" value={start} onChange={(e) => setStart(e.target.value)} className={inputClass} />
+            <input type="date" value={workStart} onChange={(e) => setWorkStart(e.target.value)} className={inputClass} />
           </div>
           <div>
             <label className={labelClass}>投標截止（日期＋時間）</label>

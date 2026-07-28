@@ -266,7 +266,7 @@ function buildSlide2(pptx: PptxGenJS, c: Case, index: number, total: number) {
   addChrome(slide, c.name, index, total);
   addSectionTitle(slide, "整體進度", 0.7);
 
-  const { doneCount, pct } = caseProgress(c);
+  const { doneCount, total: totalCheckable, pct } = caseProgress(c);
   slide.addText(`${pct}%`, {
     x: SLIDE_W - MARGIN_X - 3,
     y: 1.35,
@@ -278,7 +278,7 @@ function buildSlide2(pptx: PptxGenJS, c: Case, index: number, total: number) {
     color: COLOR.navy,
     align: "right",
   });
-  slide.addText(`${doneCount} / ${c.tasks.length} 項已完成`, {
+  slide.addText(`${doneCount} / ${totalCheckable} 項已完成`, {
     x: MARGIN_X,
     y: 1.55,
     w: 6,
@@ -447,7 +447,7 @@ export async function buildProjectPptx(c: Case): Promise<Buffer> {
   const pptx = new PptxGenJS();
   pptx.defineLayout({ name: "BID_16x9", width: SLIDE_W, height: SLIDE_H });
   pptx.layout = "BID_16x9";
-  pptx.author = "備標控台";
+  pptx.author = "業務投標管理平台 Bigmaster";
   pptx.title = `${c.name} 專案進度簡報`;
 
   const calendarMonths = buildAllMonthsCalendars(c);

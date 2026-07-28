@@ -22,15 +22,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     Credentials({
       credentials: {
-        email: { label: "Email", type: "email" },
+        username: { label: "帳號", type: "text" },
         password: { label: "Password", type: "password" },
       },
       authorize: async (credentials) => {
-        const email = typeof credentials?.email === "string" ? credentials.email.trim().toLowerCase() : "";
+        const username = typeof credentials?.username === "string" ? credentials.username.trim() : "";
         const password = typeof credentials?.password === "string" ? credentials.password : "";
-        if (!email || !password) return null;
+        if (!username || !password) return null;
 
-        const user = await db.query.users.findFirst({ where: eq(users.email, email) });
+        const user = await db.query.users.findFirst({ where: eq(users.username, username) });
         if (!user?.passwordHash) return null;
 
         const valid = await bcrypt.compare(password, user.passwordHash);

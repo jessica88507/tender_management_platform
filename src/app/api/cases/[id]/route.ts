@@ -13,9 +13,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const { id } = await params;
   const existing = await db.query.cases.findFirst({ where: eq(cases.id, id) });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (!canEditCase(existing, session.user.id)) {
-    return NextResponse.json({ error: "此案件已由其他主投標手認領，你目前僅有唯讀權限" }, { status: 403 });
-  }
+  // Anyone may edit any case now (the client warns non-owners before saving) — ownership itself
+  // is untouched below unless the case was unclaimed, so a non-owner's edit never silently
+  // takes over the case.
 
   const body = (await request.json()) as Case;
 
@@ -91,14 +91,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (body.tasks?.length) {
       await tx.insert(tasks).values(
         body.tasks.map((t, i) => ({
+          id: t.id,
           caseId: id,
+          key: t.key ?? null,
           cat: t.cat,
           label: t.label,
           note: t.note,
           owner: t.owner,
           due: t.due,
+          autoDue: t.autoDue ?? null,
           done: t.done,
           milestone: t.milestone,
+          linkedTaskId: t.linkedTaskId ?? null,
+          linkOffsetDays: t.linkOffsetDays ?? null,
           sortIndex: i,
         }))
       );

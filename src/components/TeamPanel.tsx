@@ -201,6 +201,7 @@ export function TeamPanel({ caseId, c }: { caseId: string; c: Case }) {
       className="group border border-border rounded-lg mb-3.5 bg-card shadow-sm"
       open={ui.teamOpen}
       onToggle={(e) => setTeamOpen((e.target as HTMLDetailsElement).open)}
+      data-tutorial="team-panel"
     >
       <summary className="cursor-pointer py-3 px-4 font-bold text-[22px] font-serif list-none flex items-center gap-2 [&::-webkit-details-marker]:hidden">
         <CaretRight weight="bold" size={12} className="text-accent group-open:rotate-90 transition-transform" />

@@ -5,6 +5,7 @@ import { Star, Trash } from "@phosphor-icons/react";
 import { Task } from "@/lib/types";
 import { CATEGORIES } from "@/lib/constants";
 import { fmtWeekday } from "@/lib/date";
+import { isNonCheckableTask } from "@/lib/derived";
 import { useConfirm } from "@/context/ConfirmContext";
 
 const inputClass = "w-full py-1.5 px-2 border border-border rounded-md text-[17px] bg-card focus:outline-none focus:border-accent";
@@ -84,21 +85,29 @@ export function EventDetailModal({
               />
             </div>
             <div>
-              <label className="block text-[14.5px] text-ink-soft mb-1">時間</label>
-              <input type="date" value={due} onChange={(e) => setDue(e.target.value)} className={inputClass} />
+              <label className="block text-[14.5px] text-ink-soft mb-1">時間{task.linkedTaskId ? "（已連結任務，自動跟隨）" : ""}</label>
+              <input
+                type="date"
+                value={due}
+                disabled={!!task.linkedTaskId}
+                onChange={(e) => setDue(e.target.value)}
+                className={inputClass + " disabled:opacity-60 disabled:cursor-not-allowed"}
+              />
             </div>
-            <div>
-              <label className="block text-[14.5px] text-ink-soft mb-1">狀態</label>
-              <label className="flex items-center gap-2 text-[17px] text-ink cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={done}
-                  onChange={(e) => setDone(e.target.checked)}
-                  className="w-4 h-4 accent-done-green cursor-pointer"
-                />
-                已完成
-              </label>
-            </div>
+            {!isNonCheckableTask(task) && (
+              <div>
+                <label className="block text-[14.5px] text-ink-soft mb-1">狀態</label>
+                <label className="flex items-center gap-2 text-[17px] text-ink cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={done}
+                    onChange={(e) => setDone(e.target.checked)}
+                    className="w-4 h-4 accent-done-green cursor-pointer"
+                  />
+                  已完成
+                </label>
+              </div>
+            )}
             <div>
               <label className="block text-[14.5px] text-ink-soft mb-1">分類</label>
               <select value={cat} onChange={(e) => setCat(e.target.value)} className={inputClass}>
@@ -126,17 +135,19 @@ export function EventDetailModal({
               <div className="text-[14.5px] text-ink-soft font-mono mb-0.5">時間</div>
               <div className="text-[17px] font-mono text-ink">{fmtWeekday(task.due)}</div>
             </div>
-            <div>
-              <div className="text-[14.5px] text-ink-soft font-mono mb-0.5">狀態</div>
-              <span
-                className={
-                  "inline-block text-[15.5px] font-bold rounded-full py-0.5 px-2.5 " +
-                  (task.done ? "bg-done-green/15 text-done-green" : "bg-highlight/15 text-accent")
-                }
-              >
-                {task.done ? "已完成" : "待處理"}
-              </span>
-            </div>
+            {!isNonCheckableTask(task) && (
+              <div>
+                <div className="text-[14.5px] text-ink-soft font-mono mb-0.5">狀態</div>
+                <span
+                  className={
+                    "inline-block text-[15.5px] font-bold rounded-full py-0.5 px-2.5 " +
+                    (task.done ? "bg-done-green/15 text-done-green" : "bg-highlight/15 text-accent")
+                  }
+                >
+                  {task.done ? "已完成" : "待處理"}
+                </span>
+              </div>
+            )}
             <div>
               <div className="text-[14.5px] text-ink-soft font-mono mb-0.5">分類</div>
               <div className="text-[17px] text-ink">{task.cat}</div>

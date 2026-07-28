@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { cases, consultants, tasks, teamMembers, weekNotes } from "@/db/schema";
 import { rowToCase } from "@/lib/caseMapper";
 import { generateTasks, normalizeCase, normalizeTeam } from "@/lib/scheduler";
+import { getTaskTemplateRows } from "@/lib/taskTemplatesServer";
 import type { Case } from "@/lib/types";
 
 export async function GET() {
@@ -26,15 +27,17 @@ export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = (await request.json()) as { name?: string; start?: string; deadline?: string };
-  if (!body.start || !body.deadline) {
-    return NextResponse.json({ error: "start and deadline are required" }, { status: 400 });
+  const body = (await request.json()) as { name?: string; workStart?: string; deadline?: string };
+  if (!body.workStart || !body.deadline) {
+    return NextResponse.json({ error: "workStart and deadline are required" }, { status: 400 });
   }
 
   const draft: Case = {
     name: body.name?.trim() || "未命名案件",
-    workStart: body.start,
-    start: body.start,
+    // 招標公告 (start) isn't collected upfront — it defaults to workStart and is filled in later
+    // via 案件資訊 (InfoPanel), since it's often not known yet when internal prep work begins.
+    workStart: body.workStart,
+    start: body.workStart,
     deadline: body.deadline,
     bidLead: session.user.name ?? "",
     bidLeadUserId: session.user.id,
@@ -57,7 +60,8 @@ export async function POST(request: Request) {
     tasks: [],
   };
   normalizeCase(draft);
-  draft.tasks = generateTasks(draft);
+  const templates = await getTaskTemplateRows();
+  draft.tasks = generateTasks(draft, templates);
 
   const newCase = await db.transaction(async (tx) => {
     const [created] = await tx
@@ -101,14 +105,19 @@ export async function POST(request: Request) {
     if (draft.tasks.length) {
       await tx.insert(tasks).values(
         draft.tasks.map((t, i) => ({
+          id: t.id,
           caseId: created.id,
+          key: t.key ?? null,
           cat: t.cat,
           label: t.label,
           note: t.note,
           owner: t.owner,
           due: t.due,
+          autoDue: t.autoDue ?? null,
           done: t.done,
           milestone: t.milestone,
+          linkedTaskId: t.linkedTaskId ?? null,
+          linkOffsetDays: t.linkOffsetDays ?? null,
           sortIndex: i,
         }))
       );

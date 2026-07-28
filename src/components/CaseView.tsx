@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
-import { CalendarBlank, ListChecks } from "@phosphor-icons/react";
+import { useEffect, useState } from "react";
+import { CalendarBlank, Columns, ListChecks } from "@phosphor-icons/react";
 import { Case } from "@/lib/types";
 import { useApp } from "@/context/AppContext";
 import { normalizeCase, normalizeTeam } from "@/lib/scheduler";
@@ -13,6 +13,8 @@ import { InfoPanel } from "./InfoPanel";
 import { TeamPanel } from "./TeamPanel";
 import { ListView } from "./ListView";
 import { CalendarView } from "./CalendarView";
+import { SimpleTaskList } from "./SimpleTaskList";
+import { isOnboardingDismissed, OnboardingTutorial } from "./OnboardingTutorial";
 
 // Referenced literally so Tailwind's build-time scanner generates the CSS for this
 // arbitrary-value animation utility, even though it's applied imperatively via classList.
@@ -27,12 +29,23 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 export function CaseView({ caseId, caseData }: { caseId: string; caseData: Case }) {
-  const { ui, setViewMode, updateCase, canEditActive } = useApp();
+  const { ui, setViewMode, updateCase, isCaseOwner, justCreatedId } = useApp();
+  const [showTutorial, setShowTutorial] = useState(false);
+
+  // "Adjust state during render" pattern (see react.dev) instead of an effect: reacts once per
+  // unique justCreatedId change rather than needing an explicit clear-flag round trip through
+  // context, and avoids the set-state-in-effect lint rule for a synchronous setState call.
+  const [seenJustCreatedId, setSeenJustCreatedId] = useState<string | null>(null);
+  if (justCreatedId !== seenJustCreatedId) {
+    setSeenJustCreatedId(justCreatedId);
+    if (justCreatedId === caseId && !isOnboardingDismissed()) setShowTutorial(true);
+  }
 
   useEffect(() => {
-    // Read-only viewers must never trigger a save — this normalization pass is a
-    // backfill-defaults convenience for the editor, not something a viewer should persist.
-    if (!canEditActive) return;
+    // Only the actual owner's own view triggers this backfill-defaults normalization — anyone
+    // else viewing the case would otherwise silently fire the non-owner edit-confirmation the
+    // moment they open it, which isn't a real edit and shouldn't be gated as one.
+    if (!isCaseOwner) return;
     updateCase(caseId, (draft) => {
       if (!draft.weekNotes) draft.weekNotes = {};
       draft.team = normalizeTeam(draft.team);
@@ -43,7 +56,7 @@ export function CaseView({ caseId, caseData }: { caseId: string; caseData: Case 
       });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [caseId, canEditActive]);
+  }, [caseId, isCaseOwner]);
 
   const c = caseData;
   const deadlineDT = new Date(c.deadline);
@@ -71,7 +84,9 @@ export function CaseView({ caseId, caseData }: { caseId: string; caseData: Case 
       <AlertBanner c={c} onJump={jumpToTask} />
 
       {/* 1. Page title — case name + days-remaining stamp, always visible, no card chrome. */}
-      <CaseHeader caseId={caseId} c={c} />
+      <CaseHeader caseId={caseId} c={c} onOpenTutorial={() => setShowTutorial(true)} />
+
+      {showTutorial && <OnboardingTutorial onClose={() => setShowTutorial(false)} />}
 
       {/* 2. 案件總覽：overall progress. */}
       <section className="mb-8 animate-[fadeInUp_0.4s_ease-out]">
@@ -93,7 +108,7 @@ export function CaseView({ caseId, caseData }: { caseId: string; caseData: Case 
       <section className="animate-[fadeInUp_0.4s_ease-out]" style={{ animationDelay: "0.1s", animationFillMode: "backwards" }}>
         <SectionLabel>時程管理 · Schedule</SectionLabel>
         <div className="bg-card border border-border rounded-lg p-5 shadow-sm">
-          <div className="flex mb-5.5 border border-ink rounded-md overflow-hidden w-fit">
+          <div className="flex mb-5.5 border border-ink rounded-md overflow-hidden w-fit" data-tutorial="schedule-toggle">
             <button
               onClick={() => setViewMode("cal")}
               className={
@@ -107,16 +122,39 @@ export function CaseView({ caseId, caseData }: { caseId: string; caseData: Case 
             <button
               onClick={() => setViewMode("list")}
               className={
-                "py-2.5 px-5 text-[19px] font-bold cursor-pointer flex items-center gap-1.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary " +
+                "py-2.5 px-5 text-[19px] font-bold cursor-pointer border-r border-ink flex items-center gap-1.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary " +
                 (ui.viewMode === "list" ? "bg-ink text-card" : "bg-card text-ink-soft hover:bg-muted")
               }
             >
               <ListChecks weight="bold" size={16} />
               任務清單
             </button>
+            <button
+              onClick={() => setViewMode("both")}
+              className={
+                "py-2.5 px-5 text-[19px] font-bold cursor-pointer flex items-center gap-1.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary " +
+                (ui.viewMode === "both" ? "bg-ink text-card" : "bg-card text-ink-soft hover:bg-muted")
+              }
+            >
+              <Columns weight="bold" size={16} />
+              兩者檢視
+            </button>
           </div>
 
-          {ui.viewMode === "list" ? <ListView caseId={caseId} c={c} /> : <CalendarView caseId={caseId} c={c} />}
+          {ui.viewMode === "list" ? (
+            <ListView caseId={caseId} c={c} />
+          ) : ui.viewMode === "both" ? (
+            <div className="flex gap-4 items-start">
+              <div className="w-4/5 min-w-0">
+                <CalendarView caseId={caseId} c={c} />
+              </div>
+              <div className="w-1/5 min-w-0 shrink-0 max-h-[900px] overflow-y-auto border-l border-border pl-3.5">
+                <SimpleTaskList c={c} />
+              </div>
+            </div>
+          ) : (
+            <CalendarView caseId={caseId} c={c} />
+          )}
         </div>
       </section>
     </div>

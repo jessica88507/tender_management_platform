@@ -16,6 +16,9 @@ export function AlertBanner({ c, onJump }: { c: Case; onJump: (taskId: string) =
   if (urgent.length === 0) return null;
 
   const overdueCount = urgent.filter((t) => new Date(t.due + "T00:00:00") < today).length;
+  const overdueMilestoneCount = urgent.filter(
+    (t) => new Date(t.due + "T00:00:00") < today && !!t.milestone
+  ).length;
   const visible = urgent.slice(0, MAX_VISIBLE);
   const hiddenCount = urgent.length - visible.length;
 
@@ -26,12 +29,14 @@ export function AlertBanner({ c, onJump }: { c: Case; onJump: (taskId: string) =
         title={`警示提醒・${urgent.length} 項`}
         className={
           "fixed top-20 right-4.5 z-40 w-12 h-12 rounded-full flex items-center justify-center border-2 shadow-[0_4px_14px_rgba(0,0,0,0.3)] cursor-pointer hover:brightness-95 transition-[filter] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary " +
-          (overdueCount > 0
+          (overdueMilestoneCount > 0
+            ? "bg-danger-soft border-danger animate-[milestoneOverdueFlash_0.7s_ease-in-out_infinite]"
+            : overdueCount > 0
             ? "bg-danger-soft border-danger animate-[alertGlow_1.8s_ease-in-out_infinite]"
             : "bg-highlight-soft border-highlight")
         }
       >
-        <Warning weight="fill" size={22} className="text-danger" />
+        <Warning weight="fill" size={22} className={overdueCount > 0 ? "text-danger" : "text-highlight"} />
         <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-danger text-white text-[14.5px] font-bold font-mono flex items-center justify-center border-2 border-card">
           {urgent.length}
         </span>
@@ -54,6 +59,7 @@ export function AlertBanner({ c, onJump }: { c: Case; onJump: (taskId: string) =
                 const isToday = due.getTime() === today.getTime();
                 const tag = overdue ? "已逾期" : isToday ? "今天" : "即將到期";
                 const overdueMilestone = overdue && !!t.milestone;
+                const tagColorClass = overdue ? "text-danger" : "text-highlight";
                 return (
                   <button
                     key={t.id}
@@ -64,15 +70,15 @@ export function AlertBanner({ c, onJump }: { c: Case; onJump: (taskId: string) =
                     className={
                       "text-left rounded-lg py-2.5 px-3 cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.12)] hover:brightness-95 transition-[filter] " +
                       (overdueMilestone
-                        ? "border-4 bg-danger-soft border-danger animate-[milestoneOverdueFlash_1s_ease-in-out_infinite] "
+                        ? "border-[5px] bg-danger-soft border-danger animate-[milestoneOverdueFlash_0.7s_ease-in-out_infinite] "
                         : overdue
                         ? "border-2 bg-danger-soft border-danger "
                         : "border-2 bg-highlight-soft border-highlight ")
                     }
                   >
                     <div className="flex items-center gap-1.5 mb-1">
-                      <Warning weight="fill" size={13} className="shrink-0 text-danger" />
-                      <span className="text-[14.5px] font-bold text-danger">{tag}</span>
+                      <Warning weight="fill" size={13} className={"shrink-0 " + tagColorClass} />
+                      <span className={"text-[14.5px] font-bold " + tagColorClass}>{tag}</span>
                       {t.milestone && <Star weight="fill" size={11} className="text-highlight shrink-0" />}
                     </div>
                     <div className="text-[17.5px] font-bold text-ink leading-snug">{t.label}</div>

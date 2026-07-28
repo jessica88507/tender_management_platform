@@ -32,7 +32,13 @@ export function CalendarView({ caseId, c }: { caseId: string; c: Case }) {
   const tenderStart = new Date(c.start + "T00:00:00");
   const deadlineDT = new Date(c.deadline);
   const deadline = new Date(deadlineDT.getFullYear(), deadlineDT.getMonth(), deadlineDT.getDate());
-  const rangeStart = workStart < tenderStart ? workStart : tenderStart;
+  // Highlighted "active" range runs from 統包啟動會議 (kickoff, 招標公告前7天) through 施工評選簡報日
+  // (eval presentation day, 投標截止後14天) — see scheduler.ts's "kickoff"/"eval_presentation_day"
+  // rules — so both bookend events actually fall inside the highlighted range, not just the
+  // narrower 招標公告～投標截止 window.
+  const kickoff = addDays(tenderStart, -7);
+  const evalDay = addDays(deadline, 14);
+  const rangeStart = [workStart, tenderStart, kickoff].reduce((a, b) => (a < b ? a : b));
   const rangeEnd = addDays(deadline, 30);
 
   const cursorStart = new Date(rangeStart);
@@ -153,7 +159,7 @@ export function CalendarView({ caseId, c }: { caseId: string; c: Case }) {
               <tr>
                 {week.days.map((d, i) => {
                   const iso = toISO(d);
-                  const inRange = d >= rangeStart && d <= deadline;
+                  const inRange = d >= rangeStart && d <= evalDay;
                   const dayTasks = (tasksByDate[iso] || []).slice().sort((a, b) => (b.milestone ? 1 : 0) - (a.milestone ? 1 : 0));
                   const isToday = iso === todayISO;
                   const hasAlert = alertDates.has(iso);
@@ -226,9 +232,9 @@ export function CalendarView({ caseId, c }: { caseId: string; c: Case }) {
                         return (
                         <div
                           key={t.id}
-                          draggable={canEditActive}
+                          draggable={canEditActive && !t.linkedTaskId}
                           onDragStart={(e) => {
-                            if (!canEditActive) return;
+                            if (!canEditActive || t.linkedTaskId) return;
                             e.dataTransfer.setData("text/plain", t.id);
                             e.dataTransfer.effectAllowed = "move";
                             setDraggingId(t.id);
@@ -238,7 +244,7 @@ export function CalendarView({ caseId, c }: { caseId: string; c: Case }) {
                             e.stopPropagation();
                             setSelectedTask(t);
                           }}
-                          title={t.owner || ""}
+                          title={t.linkedTaskId ? "已連結任務，日期會自動跟隨（無法拖曳）" : t.owner || ""}
                           style={{ ["--cat-color" as string]: catColor(t.cat) }}
                           className={
                             "text-[15.5px] leading-[1.4] py-1 px-1.5 mb-0.5 rounded-md bg-black/5 border-l-[3px] [border-left-color:var(--cat-color)] flex items-center gap-1 cursor-pointer transition-[filter,box-shadow] hover:brightness-95 hover:shadow-[0_1px_3px_rgba(0,0,0,0.12)] " +
@@ -296,7 +302,7 @@ export function CalendarView({ caseId, c }: { caseId: string; c: Case }) {
       </div>
 
       <div className="text-[15.5px] text-ink-soft mt-2.5 font-mono">
-        提示：點日期格右上角「＋」可直接新增事件；點選事件卡片可檢視詳情；拖曳事件卡片到其他日期即可改期，會自動同步回任務清單／整體進度上的大事記標記。淺色網底的日期表示已超出目前的內部開案～截止範圍（投標截止後仍保留1個月供評選作業使用）。
+        提示：點日期格右上角「＋」可直接新增事件；點選事件卡片可檢視詳情；拖曳事件卡片到其他日期即可改期，會自動同步回任務清單／整體進度上的大事記標記。淺色網底的日期表示已超出統包啟動會議～施工評選簡報日的範圍（之後仍保留至投標截止後1個月供評選作業使用）。
       </div>
 
       {addingDate && (

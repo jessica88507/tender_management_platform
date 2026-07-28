@@ -18,13 +18,25 @@ export type Team = {
 
 export type Task = {
   id: string;
+  // Template key this task was generated from (see taskTemplates.ts), used to match tasks across
+  // regenerations without overwriting manual edits. Null for tasks that predate this field or
+  // were added by hand.
+  key?: string | null;
   cat: string;
   label: string;
   note: string;
   owner: string;
   due: string; // YYYY-MM-DD
+  // Last value the scheduling engine computed for `due`. If `due !== autoDue`, the task's date
+  // has been manually adjusted and a non-destructive regenerate must leave it alone.
+  autoDue?: string | null;
   done: boolean;
   milestone: string | null;
+  // Manual link to another task in the same case — this task's `due` follows the linked task's
+  // `due` + linkOffsetDays whenever the target moves (see ListView.tsx's 連結任務 dropdown).
+  // A dangling id (target since deleted) is simply treated as "no link".
+  linkedTaskId?: string | null;
+  linkOffsetDays?: number | null;
 };
 
 export type Case = {
@@ -63,4 +75,4 @@ export type AppState = {
   lastActiveId: string | null;
 };
 
-export type ViewMode = "cal" | "list";
+export type ViewMode = "cal" | "list" | "both";

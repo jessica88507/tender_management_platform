@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { AppState, Case, ViewMode } from "@/lib/types";
-import { canEditCase } from "@/lib/derived";
+import { canEditCase, resolveLinkedTaskDates } from "@/lib/derived";
 import { useConfirm } from "@/context/ConfirmContext";
 
 const LAST_ACTIVE_KEY = "bid-scheduler-last-active-id";
@@ -27,7 +27,11 @@ type AppContextValue = {
   ui: UIState;
   loading: boolean;
   currentUserId: string | null;
+  // Always true now — anyone may edit any case (see isCaseOwner for the actual ownership check
+  // used to gate the non-owner confirmation warning). Kept as a separate flag from isCaseOwner
+  // so existing `disabled={!canEditActive}` call sites across components didn't need touching.
   canEditActive: boolean;
+  isCaseOwner: boolean;
   setActiveId: (id: string | null) => void;
   setViewMode: (v: ViewMode) => void;
   setInfoEditing: (v: boolean) => void;
@@ -35,14 +39,18 @@ type AppContextValue = {
   setInfoOpen: (v: boolean) => void;
   setTeamOpen: (v: boolean) => void;
   updateCase: (id: string, updater: (c: Case) => void) => void;
-  createCase: (data: { name: string; start: string; deadline: string }) => void;
+  createCase: (data: { name: string; workStart: string; deadline: string }) => void;
   deleteCase: (id: string) => void;
+  // Set to the new case's id right after createCase succeeds — CaseView compares this against
+  // its own caseId (once, via the "adjust state during render" pattern) to decide whether to
+  // auto-show the 新手教學 onboarding tutorial. See OnboardingTutorial.tsx.
+  justCreatedId: string | null;
 };
 
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const { customAlert } = useConfirm();
+  const { customAlert, customConfirm } = useConfirm();
   const { data: session } = useSession();
   const currentUserId = session?.user?.id ?? null;
   const [state, setState] = useState<AppState>(emptyState());
@@ -57,6 +65,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   });
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const pendingSaves = useRef<Record<string, Case>>({});
+  const [justCreatedId, setJustCreatedId] = useState<string | null>(null);
+  // Case ids the current user has already confirmed editing despite not being the 主投標手 —
+  // resets on page reload, so the warning reappears each new session, not each keystroke.
+  const nonOwnerConfirmed = useRef<Set<string>>(new Set());
 
   // Initial load: cases live in Postgres now, so this genuinely has to be a network fetch —
   // not something a lazy useState initializer can do synchronously (unlike the old localStorage
@@ -122,13 +134,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [customAlert]
   );
 
-  const updateCase = useCallback(
+  const applyCaseUpdate = useCallback(
     (id: string, updater: (c: Case) => void) => {
       setState((prev) => {
         const existing = prev.cases[id];
         if (!existing) return prev;
         const next: Case = JSON.parse(JSON.stringify(existing));
         updater(next);
+        next.tasks = resolveLinkedTaskDates(next.tasks);
         persistCase(id, next);
         return { ...prev, cases: { ...prev.cases, [id]: next } };
       });
@@ -136,8 +149,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [persistCase]
   );
 
+  // Anyone can edit any case now, but the first time a non-owner (someone other than the
+  // case's 主投標手) touches a case in this session, gate the change behind a blocking
+  // confirmation — subsequent edits to that same case go straight through.
+  const updateCase = useCallback(
+    (id: string, updater: (c: Case) => void) => {
+      const existing = state.cases[id];
+      if (!existing) return;
+      if (canEditCase(existing, currentUserId) || nonOwnerConfirmed.current.has(id)) {
+        applyCaseUpdate(id, updater);
+        return;
+      }
+      customConfirm(
+        `你並非本案「${existing.name}」的主投標手（目前為 ${existing.bidLead || "尚未指定"}），確定要修改這個案件的內容嗎？`
+      ).then((ok) => {
+        if (ok) {
+          nonOwnerConfirmed.current.add(id);
+          applyCaseUpdate(id, updater);
+        }
+      });
+    },
+    [state.cases, currentUserId, customConfirm, applyCaseUpdate]
+  );
+
   const createCase = useCallback(
-    (data: { name: string; start: string; deadline: string }) => {
+    (data: { name: string; workStart: string; deadline: string }) => {
       (async () => {
         try {
           const res = await fetch("/api/cases", {
@@ -150,6 +186,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setState((prev) => ({ ...prev, cases: { ...prev.cases, [id]: created } }));
           setActiveId(id);
           setUi({ viewMode: "cal", infoEditing: true, teamEditing: true, infoOpen: true, teamOpen: true });
+          setJustCreatedId(id);
         } catch (err) {
           console.error(err);
           await customAlert("建立案件失敗，請稍後再試。");
@@ -184,7 +221,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 
   const activeCase = activeId ? state.cases[activeId] ?? null : null;
-  const canEditActive = activeCase ? canEditCase(activeCase, currentUserId) : true;
+  const isCaseOwner = activeCase ? canEditCase(activeCase, currentUserId) : true;
 
   const value: AppContextValue = {
     state,
@@ -193,7 +230,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     ui,
     loading,
     currentUserId,
-    canEditActive,
+    canEditActive: true,
+    isCaseOwner,
     setActiveId,
     setViewMode: (v) => setUi((prev) => ({ ...prev, viewMode: v })),
     setInfoEditing: (v) => setUi((prev) => ({ ...prev, infoEditing: v })),
@@ -203,6 +241,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     updateCase,
     createCase,
     deleteCase,
+    justCreatedId,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

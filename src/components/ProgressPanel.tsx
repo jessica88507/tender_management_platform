@@ -61,7 +61,7 @@ function MilestoneCard({
 }
 
 export function ProgressPanel({ c, onJump }: { c: Case; onJump: (taskId: string) => void }) {
-  const { doneCount, pct } = caseProgress(c);
+  const { doneCount, total, pct } = caseProgress(c);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -90,7 +90,7 @@ export function ProgressPanel({ c, onJump }: { c: Case; onJump: (taskId: string)
             </span>
           </div>
           <div className="font-mono text-[17px] font-bold text-ink-soft">
-            {doneCount} / {c.tasks.length} 項已完成
+            {doneCount} / {total} 項已完成
           </div>
         </div>
       </div>

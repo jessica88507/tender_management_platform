@@ -23,7 +23,7 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "備標控台 — 備標時程規劃工具",
+  title: "業務投標管理平台 Bigmaster",
   description: "自動依公司備標作業流程產生投標待辦清單與時程表",
 };
 
@@ -39,15 +39,19 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full bg-background font-sans text-ink antialiased">
-        {/* Runs before hydration/paint so the correct theme is already applied — avoids a
-            flash of the wrong theme on load. Reads the manual preference if one was saved,
-            otherwise falls back to the OS preference. `beforeInteractive` is Next.js's own
-            mechanism for this. The script sets data-theme on <html> before React hydrates,
-            which the server obviously couldn't have rendered — suppressHydrationWarning above
-            is the standard, deliberate opt-out for exactly this one attribute (not a blanket
-            suppression of real mismatches, since it only affects the <html> element itself). */}
+        {/* Runs before hydration/paint so the login screen always starts light — deliberately
+            ignores both the OS preference and any previously-saved dark preference at this
+            stage, since whether anyone is signed in (and whose preference would even apply)
+            isn't known until the session check resolves. ClientApp.tsx re-applies the signed-in
+            user's own saved preference in an effect once that session is confirmed; on sign-out
+            it flips back to light for whoever's turn is next on this device. `beforeInteractive`
+            is Next.js's own mechanism for running this before hydration. The script sets
+            data-theme on <html> before React hydrates, which the server obviously couldn't have
+            rendered — suppressHydrationWarning above is the standard, deliberate opt-out for
+            exactly this one attribute (not a blanket suppression of real mismatches, since it
+            only affects the <html> element itself). */}
         <Script id="theme-init" strategy="beforeInteractive">
-          {"(function(){try{var s=localStorage.getItem('bid-scheduler-theme');var t=s||(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();"}
+          {"document.documentElement.setAttribute('data-theme','light');"}
         </Script>
         <AuthSessionProvider>{children}</AuthSessionProvider>
       </body>

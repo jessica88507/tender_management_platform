@@ -7,7 +7,7 @@ import { useConfirm } from "@/context/ConfirmContext";
 type Member = {
   id: string;
   name: string | null;
-  email: string | null;
+  username: string | null;
   department: string | null;
   role: "member" | "admin";
   createdAt: string;
@@ -27,7 +27,7 @@ function EditRow({
 }) {
   const { customAlert } = useConfirm();
   const [name, setName] = useState(member.name || "");
-  const [email, setEmail] = useState(member.email || "");
+  const [username, setUsername] = useState(member.username || "");
   const [department, setDepartment] = useState(member.department || "");
   const [password, setPassword] = useState("");
   const [saving, setSaving] = useState(false);
@@ -38,7 +38,7 @@ function EditRow({
       const res = await fetch(`/api/users/${member.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, department, ...(password ? { password } : {}) }),
+        body: JSON.stringify({ name, username, department, ...(password ? { password } : {}) }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -59,10 +59,9 @@ function EditRow({
       <td className="border-b border-dashed border-border py-2 px-2">
         <input
           className={cellInputClass + " font-mono"}
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="電子郵件"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="帳號"
         />
       </td>
       <td className="border-b border-dashed border-border py-2 px-2">
@@ -80,7 +79,7 @@ function EditRow({
       <td className="border-b border-dashed border-border py-2 px-2 whitespace-nowrap">
         <button
           onClick={handleSave}
-          disabled={saving || !name.trim() || !email.trim()}
+          disabled={saving || !name.trim() || !username.trim()}
           title="儲存"
           className="text-accent hover:bg-accent/10 cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary p-1 disabled:opacity-50"
         >
@@ -102,7 +101,7 @@ export function MembersPanel() {
   const { customConfirm, customAlert } = useConfirm();
   const [members, setMembers] = useState<Member[] | null>(null);
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [department, setDepartment] = useState("業務部");
   const [submitting, setSubmitting] = useState(false);
@@ -125,7 +124,7 @@ export function MembersPanel() {
       const res = await fetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, department }),
+        body: JSON.stringify({ name, username, password, department }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -133,7 +132,7 @@ export function MembersPanel() {
         return;
       }
       setName("");
-      setEmail("");
+      setUsername("");
       setPassword("");
       setDepartment("業務部");
       load();
@@ -143,7 +142,7 @@ export function MembersPanel() {
   };
 
   const handleDelete = async (m: Member) => {
-    const ok = await customConfirm(`確定要刪除成員「${m.name || m.email}」嗎？此動作無法復原。`);
+    const ok = await customConfirm(`確定要刪除成員「${m.name || m.username}」嗎？此動作無法復原。`);
     if (!ok) return;
     const res = await fetch(`/api/users/${m.id}`, { method: "DELETE" });
     if (!res.ok) {
@@ -170,10 +169,9 @@ export function MembersPanel() {
           />
           <input
             className={inputClass}
-            type="email"
-            placeholder="電子郵件"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            placeholder="帳號"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
             required
           />
           <input
@@ -206,7 +204,7 @@ export function MembersPanel() {
           <thead>
             <tr>
               <th className="text-left font-mono text-[14.5px] text-ink-soft border-b-2 border-ink py-1.5 px-2">姓名</th>
-              <th className="text-left font-mono text-[14.5px] text-ink-soft border-b-2 border-ink py-1.5 px-2">電子郵件</th>
+              <th className="text-left font-mono text-[14.5px] text-ink-soft border-b-2 border-ink py-1.5 px-2">帳號</th>
               <th className="text-left font-mono text-[14.5px] text-ink-soft border-b-2 border-ink py-1.5 px-2">部門</th>
               <th className="text-left font-mono text-[14.5px] text-ink-soft border-b-2 border-ink py-1.5 px-2">角色</th>
               <th className="border-b-2 border-ink py-1.5 px-2"></th>
@@ -229,7 +227,7 @@ export function MembersPanel() {
                   <UserCircle weight="fill" size={16} className="text-steel" />
                   {m.name || "—"}
                 </td>
-                <td className="border-b border-dashed border-border py-2 px-2 font-mono">{m.email}</td>
+                <td className="border-b border-dashed border-border py-2 px-2 font-mono">{m.username}</td>
                 <td className="border-b border-dashed border-border py-2 px-2">{m.department || "—"}</td>
                 <td className="border-b border-dashed border-border py-2 px-2">
                   {m.role === "admin" ? (

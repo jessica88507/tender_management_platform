@@ -1,8 +1,8 @@
 "use client";
 
-import { FolderOpen, Users } from "@phosphor-icons/react";
+import { FolderOpen, ListChecks, Users } from "@phosphor-icons/react";
 
-export type AdminSection = "members" | "projects";
+export type AdminSection = "members" | "projects" | "templates";
 
 export function AdminSidebar({
   section,
@@ -14,6 +14,7 @@ export function AdminSidebar({
   const items: { key: AdminSection; label: string; icon: typeof Users }[] = [
     { key: "members", label: "系統成員", icon: Users },
     { key: "projects", label: "專案管理", icon: FolderOpen },
+    { key: "templates", label: "預設排程規則", icon: ListChecks },
   ];
 
   return (

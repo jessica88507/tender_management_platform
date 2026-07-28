@@ -29,13 +29,17 @@ type CaseRow = {
   createdByUserId: string | null;
   tasks: {
     id: string;
+    key: string | null;
     cat: string;
     label: string;
     note: string;
     owner: string;
     due: string;
+    autoDue: string | null;
     done: boolean;
     milestone: string | null;
+    linkedTaskId: string | null;
+    linkOffsetDays: number | null;
   }[];
   teamMembers: { id: string; kind: "architect" | "mep"; name: string; sortIndex: number }[];
   consultants: {
@@ -54,13 +58,17 @@ type CaseRow = {
 export function rowToCase(row: CaseRow): Case {
   const tasks: Task[] = row.tasks.map((t) => ({
     id: t.id,
+    key: t.key,
     cat: t.cat,
     label: t.label,
     note: t.note,
     owner: t.owner,
     due: t.due,
+    autoDue: t.autoDue,
     done: t.done,
     milestone: t.milestone,
+    linkedTaskId: t.linkedTaskId,
+    linkOffsetDays: t.linkOffsetDays,
   }));
 
   const consultants: Consultant[] = [...row.consultants]

@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { ArrowClockwise, CaretRight, ClipboardText, FileArrowUp, Lightbulb, PencilSimple, Check } from "@phosphor-icons/react";
-import { Case } from "@/lib/types";
+import { Case, Task } from "@/lib/types";
 import { useApp } from "@/context/AppContext";
 import { useConfirm } from "@/context/ConfirmContext";
 import { WEEKDAY_NAMES } from "@/lib/constants";
 import { generateTasks } from "@/lib/scheduler";
+import type { TaskTemplateRow } from "@/lib/taskTemplates";
 
 type Member = { id: string; name: string | null };
 
@@ -107,13 +108,53 @@ export function InfoPanel({ caseId, c, totalDays }: { caseId: string; c: Case; t
 
   const handleRegen = async () => {
     const ok = await customConfirm(
-      "確定要依目前的案件資訊重新產生排程嗎？這會覆蓋目前所有任務（含已完成勾選與手動調整）。"
+      "確定要依目前的案件資訊調整排程嗎？只會更新與上方欄位相關的日期；已指定的負責人、備註、完成狀態與手動調整過日期的任務都不會被覆蓋。"
     );
-    if (ok) {
-      updateCase(caseId, (draft) => {
-        draft.tasks = generateTasks(draft);
-      });
+    if (!ok) return;
+
+    let templates: TaskTemplateRow[] | undefined;
+    try {
+      const res = await fetch("/api/task-templates");
+      if (res.ok) templates = (await res.json()).templates;
+    } catch {
+      templates = undefined;
     }
+
+    updateCase(caseId, (draft) => {
+      const fresh = generateTasks(draft, templates);
+      const oldByKey = new Map(draft.tasks.filter((t) => t.key).map((t) => [t.key as string, t]));
+      const freshKeys = new Set(fresh.map((f) => f.key).filter(Boolean));
+
+      const merged: Task[] = fresh.map((f) => {
+        const old = f.key ? oldByKey.get(f.key) : undefined;
+        if (!old) return f;
+        // A task counts as "manually adjusted" once its due date has drifted from what the
+        // engine last computed for it — in that case leave the date alone on regenerate.
+        const manuallyMoved = old.autoDue != null && old.due !== old.autoDue;
+        return {
+          ...f,
+          id: old.id,
+          owner: old.owner,
+          note: old.note,
+          done: old.done,
+          due: manuallyMoved ? old.due : f.due,
+          // Preserve any manual 連結任務 link — resolveLinkedTaskDates (run by updateCase right
+          // after this) will reconcile `due` against the link target regardless of what value
+          // ends up here, so the link surviving the regenerate is what actually matters.
+          linkedTaskId: old.linkedTaskId ?? null,
+          linkOffsetDays: old.linkOffsetDays ?? null,
+        };
+      });
+
+      // Tasks whose key no longer appears in the fresh generation (legacy tasks with no key,
+      // custom manual additions, or rules an admin has since disabled) are left untouched rather
+      // than silently dropped.
+      const orphaned = draft.tasks.filter((t) => !t.key || !freshKeys.has(t.key));
+
+      draft.tasks = [...merged, ...orphaned].sort(
+        (a, b) => new Date(a.due).getTime() - new Date(b.due).getTime()
+      );
+    });
   };
 
   return (
@@ -121,6 +162,7 @@ export function InfoPanel({ caseId, c, totalDays }: { caseId: string; c: Case; t
       className="group border border-border rounded-lg mb-3.5 bg-card shadow-sm"
       open={ui.infoOpen}
       onToggle={(e) => setInfoOpen((e.target as HTMLDetailsElement).open)}
+      data-tutorial="info-panel"
     >
       <summary className="cursor-pointer py-3 px-4 font-bold text-[22px] font-serif list-none flex items-center gap-2 [&::-webkit-details-marker]:hidden">
         <CaretRight weight="bold" size={12} className="text-accent group-open:rotate-90 transition-transform" />
@@ -150,7 +192,14 @@ export function InfoPanel({ caseId, c, totalDays }: { caseId: string; c: Case; t
               {viewFields.map(([label, value]) => (
                 <div key={label}>
                   <label className={labelClass}>{label}</label>
-                  <div className="text-[21px] font-mono text-ink py-1 px-0.5 font-semibold">{value}</div>
+                  <div
+                    className={
+                      "text-[21px] font-mono py-1 px-0.5 font-semibold " +
+                      (value === "—" ? "text-ink-soft font-normal" : "text-accent")
+                    }
+                  >
+                    {value}
+                  </div>
                 </div>
               ))}
             </div>
@@ -387,12 +436,12 @@ export function InfoPanel({ caseId, c, totalDays }: { caseId: string; c: Case; t
               <div className="flex items-start gap-2 bg-highlight-soft border border-highlight rounded-lg py-2.5 px-3.5 text-ink text-[16px] w-full">
                 <Lightbulb weight="fill" size={16} className="shrink-0 mt-0.5 text-highlight" />
                 <span>
-                  80億＝8,000,000,000元（契約金額≥80億時標前會排3場，否則排1場）。調整上方欄位不會自動改動既有任務，如需依新設定全部重排，請按下方按鈕（會覆蓋目前所有任務）。
+                  調整上方欄位不會自動改動既有任務，如需套用新設定，請按下方按鈕（只調整相關日期，不會覆蓋已指派的負責人或手動調整過的任務）。
                 </span>
               </div>
               <button className={btnMiniClass} onClick={handleRegen}>
                 <ArrowClockwise weight="bold" size={14} />
-                重新依目前設定產生排程（覆蓋所有任務）
+                依目前設定調整排程（不覆蓋既有指派與手動調整）
               </button>
             </div>
           </>

@@ -6,20 +6,21 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 @theme {
-  /* Structural surfaces */
-  --color-background: #f8fafc;
+  /* Structural surfaces — cool blueprint-gray instead of warm paper, to match the
+     high-tech/civil-engineering identity introduced on the login page. */
+  --color-background: #f1f5f9;
   --color-card: #ffffff;
-  --color-muted: #eef2f7;
-  --color-border: #e2e8f0;
+  --color-muted: #e6edf5;
+  --color-border: #cbd8e6;
 
   /* Text */
-  --color-ink: #0f172a;
-  --color-ink-soft: #64748b;
+  --color-ink: #0a1420;
+  --color-ink-soft: #46586e;
 
-  /* Brand + semantic actions */
-  --color-primary: #0369a1;
-  --color-primary-dark: #075985;
-  --color-accent: #334155;
+  /* Brand + semantic actions — blueprint blue/cyan, matching LoginScreen.tsx */
+  --color-primary: #0284c7;
+  --color-primary-dark: #0369a1;
+  --color-accent: #0284c7;
   --color-highlight: #b45309;
   --color-danger: #dc2626;
   --color-done-green: #059669;
@@ -48,17 +49,19 @@
    uses these utilities (bg-card, text-ink, border-border, etc.) re-themes automatically with zero
    component changes, since Tailwind utilities all resolve through these CSS custom properties. */
 :root[data-theme="dark"] {
-  --color-background: #0b1220;
-  --color-card: #131b2e;
-  --color-muted: #1a2338;
-  --color-border: #2a3550;
+  --color-background: #050b12;
+  --color-card: #0d1a24;
+  --color-muted: #142230;
+  --color-border: #1e3a4a;
 
-  --color-ink: #f1f5f9;
-  --color-ink-soft: #94a3b8;
+  /* Brighter + bolder than before (was slate-100/slate-400, read as thin and gray) — near-white
+     ink and a lighter ink-soft so secondary text stays legible against the dark blueprint bg. */
+  --color-ink: #ffffff;
+  --color-ink-soft: #cbd8e6;
 
   --color-primary: #38bdf8;
   --color-primary-dark: #0ea5e9;
-  --color-accent: #94a3b8;
+  --color-accent: #38bdf8;
   --color-highlight: #fbbf24;
   --color-danger: #f87171;
   --color-done-green: #34d399;
@@ -76,6 +79,27 @@
   --color-weekend-red: #fb7185;
 
   --shadow-tab: rgba(0, 0, 0, 0.55);
+}
+
+/* Faint blueprint/engineering-drawing grid behind the whole app, echoing LoginScreen.tsx's
+   high-tech/civil-engineering identity — kept subtle since it sits behind content-bearing cards,
+   not a hero surface like the login page. */
+body {
+  background-color: var(--color-background);
+  background-image: linear-gradient(rgba(2, 132, 199, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(2, 132, 199, 0.05) 1px, transparent 1px);
+  background-size: 28px 28px;
+  background-attachment: fixed;
+}
+
+/* Dark mode reads noticeably thinner than light mode at the same font-weight (light text on a
+   dark ground has less perceived weight than dark text on light) — bump the baseline weight
+   app-wide instead of touching every component's className, matching the login page's bold,
+   legible look. Buttons/headings already set their own explicit font-bold and are unaffected. */
+:root[data-theme="dark"] body {
+  font-weight: 500;
+  background-image: linear-gradient(rgba(56, 189, 248, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 189, 248, 0.07) 1px, transparent 1px);
 }
 
 /*
@@ -107,16 +131,36 @@
 }
 
 /* Overdue 大事記 (milestones) flash faster/brighter than the general alertGlow above — they're
-   meant to read as a higher-severity signal than an ordinary overdue task. */
+   meant to read as the highest-severity signal, above a plain overdue task or an upcoming one.
+   Invoked with a shorter duration (see AlertBanner.tsx) than alertGlow so it visibly blinks more
+   often, and peaks at a deeper, more saturated red than the ordinary overdue styling. */
 @keyframes milestoneOverdueFlash {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
-    background-color: var(--color-card);
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+    background-color: var(--color-danger-soft);
   }
   50% {
-    box-shadow: 0 0 18px 5px rgba(239, 68, 68, 0.85);
-    background-color: var(--color-danger-soft);
+    box-shadow: 0 0 30px 9px rgba(220, 38, 38, 0.95);
+    background-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-danger-soft));
+  }
+}
+
+/* Login page's blueprint-scan sweep — see LoginScreen.tsx. */
+@keyframes loginScan {
+  0% {
+    top: 0%;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
   }
 }
 

@@ -1,18 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { DotsSixVertical, Plus, Star, Trash } from "@phosphor-icons/react";
+import { DotsSixVertical, LinkSimple, Plus, Star, Trash } from "@phosphor-icons/react";
 import { Case, Task } from "@/lib/types";
 import { useApp } from "@/context/AppContext";
 import { CATEGORIES, catColor, catLetter } from "@/lib/constants";
 import { catIconComponent } from "@/lib/categoryIcons";
 import { fmtWeekday, toISO, uid } from "@/lib/date";
 import { getOwnerOptions } from "@/lib/scheduler";
+import { isNonCheckableTask } from "@/lib/derived";
 
 function TaskRow({ caseId, t, c, index }: { caseId: string; t: Task; c: Case; index: number }) {
   const { updateCase, canEditActive } = useApp();
   const ownerOptions = getOwnerOptions(c);
   if (t.owner && !ownerOptions.includes(t.owner)) ownerOptions.push(t.owner);
+  const linkOptions = c.tasks.filter((x) => x.id !== t.id);
 
   const patchTask = (patch: Partial<Task>) => {
     updateCase(caseId, (draft) => {
@@ -31,7 +33,7 @@ function TaskRow({ caseId, t, c, index }: { caseId: string; t: Task; c: Case; in
     <div
       id={`task-row-${t.id}`}
       className={
-        "flex items-center gap-2 py-2 pr-1 pl-2.5 min-w-[880px] border-b border-dashed border-border border-l-[3px] [border-left-color:var(--cat-color)] " +
+        "flex items-center gap-2 py-2 pr-1 pl-2.5 min-w-[1080px] border-b border-dashed border-border border-l-[3px] [border-left-color:var(--cat-color)] " +
         (t.done ? "opacity-50 " : "") +
         (t.milestone ? "!border-l-highlight bg-highlight/10" : "")
       }
@@ -88,13 +90,45 @@ function TaskRow({ caseId, t, c, index }: { caseId: string; t: Task; c: Case; in
           </option>
         ))}
       </select>
+      <div className="flex items-center gap-1 shrink-0" title="連結任務：日期會自動跟隨所選任務">
+        <LinkSimple weight="bold" size={13} className={t.linkedTaskId ? "text-accent" : "text-border"} />
+        <select
+          value={t.linkedTaskId || ""}
+          disabled={!canEditActive}
+          onChange={(e) => {
+            const val = e.target.value;
+            patchTask(val ? { linkedTaskId: val, linkOffsetDays: t.linkOffsetDays ?? 0 } : { linkedTaskId: null, linkOffsetDays: null });
+          }}
+          className="w-[110px] text-[15px] border border-transparent bg-transparent text-ink-soft py-1 px-1 rounded focus:border-border focus:bg-card focus:outline-none disabled:cursor-not-allowed"
+        >
+          <option value="">— 不連結</option>
+          {linkOptions.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        {t.linkedTaskId && (
+          <>
+            <input
+              type="number"
+              value={t.linkOffsetDays ?? 0}
+              disabled={!canEditActive}
+              onChange={(e) => patchTask({ linkOffsetDays: Number(e.target.value) })}
+              className="w-11 text-[15px] font-mono border border-border rounded py-1 px-1 bg-card text-ink-soft focus:outline-none focus:border-accent disabled:cursor-not-allowed"
+            />
+            <span className="text-[14px] text-ink-soft">天</span>
+          </>
+        )}
+      </div>
       <span className="font-mono text-[17px] text-ink-soft">{fmtWeekday(t.due)}</span>
       <input
         type="date"
         value={t.due}
-        disabled={!canEditActive}
+        disabled={!canEditActive || !!t.linkedTaskId}
+        title={t.linkedTaskId ? "已連結任務，日期會自動跟隨" : undefined}
         onChange={(e) => patchTask({ due: e.target.value })}
-        className="font-mono text-[18px] font-semibold border border-transparent bg-transparent text-ink-soft py-1 px-1 rounded w-[172px] shrink-0 focus:border-border focus:bg-card focus:outline-none disabled:cursor-not-allowed"
+        className="font-mono text-[18px] font-semibold border border-transparent bg-transparent text-ink-soft py-1 px-1 rounded w-[172px] shrink-0 focus:border-border focus:bg-card focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
       />
       {canEditActive && (
         <button title="刪除" onClick={removeTask} className="text-border hover:text-danger cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-danger shrink-0 py-0.5 px-1.5">
@@ -146,6 +180,8 @@ export function ListView({ caseId, c }: { caseId: string; c: Case }) {
       {catsPresent.map((cat) => {
         const tasks = c.tasks
           .filter((t) => t.cat === cat)
+          // 招標公告／投標截止 are calendar-only markers, never shown as checkable rows here.
+          .filter((t) => !isNonCheckableTask(t))
           .sort((a, b) => new Date(a.due).getTime() - new Date(b.due).getTime());
         if (tasks.length === 0 && !(CATEGORIES as readonly string[]).includes(cat)) return null;
         const doneInCat = tasks.filter((t) => t.done).length;
