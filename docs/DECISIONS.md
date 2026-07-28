@@ -271,3 +271,44 @@ tightening of density, not a new design direction.
 by ~0.85 (rounded to a sane `.5`-ish step), left icon `size={}` props alone (the ask was about font, not icon
 scale) and left `SectionLabel`'s "時程管理 · SCHEDULE" heading alone (shared across all three section headers,
 not schedule-specific content).
+
+## 20. 招標文件自動判讀 rebuilt again: Anthropic API → rule-based OCR + keyword/regex extraction
+
+**Context**: The user asked whether 招標文件自動判讀 could work without calling any LLM API at all (cost/
+dependency concern), specifically via "相似詞" (keyword/synonym) matching instead of AI reading comprehension.
+Explored the option space first (a written response, not code): traditional OCR + keyword dictionaries can run
+entirely inside a Vercel serverless function (no persistent process); a self-hosted open-source LLM (e.g.
+Ollama) cannot — Vercel Functions have no persistent disk or long-running process to host a loaded model, so
+that path would require a separately-hosted service reachable over HTTP, which reintroduces the same
+"depends on an external service" problem the user was trying to avoid. Given that, the user chose to proceed
+with the OCR + keyword path, on a new branch (`feature/ocr-tender-extraction`).
+**Decision**: Replaced the Anthropic-API implementation in `src/app/api/extract-tender/route.ts` with a new
+`src/lib/tenderExtract/` module: `extractText.ts` (PDF text-layer read via `pdfjs-dist`, with a render-to-PNG +
+`tesseract.js` OCR fallback for pages with little/no text layer, and for plain image uploads) and
+`parseFields.ts` (keyword/synonym label matching + regex parsing for dates/money/area). Removed
+`@anthropic-ai/sdk` and the `ANTHROPIC_API_KEY` env var entirely (added `pdfjs-dist`, `tesseract.js`,
+`@napi-rs/canvas` — the last one specifically because it ships prebuilt binaries per platform, unlike `canvas`,
+which needs system Cairo/Pango and would need extra work to run on Vercel).
+**Validated against real documents, not synthetic test data** — this materially changed the design partway
+through:
+- Downloaded an actual 招標公告 from 政府電子採購網 and a real 統包工程需求書 (technical spec) to test with,
+  rather than trusting hand-written sample text. This caught real bugs hand-written tests wouldn't: (1) the
+  real 招標公告 turned out to be a **scanned/rasterized PDF with zero text layer** — the OCR fallback exists
+  specifically because of this, not as a speculative feature; (2) real ROC dates are commonly written
+  "115/06/25" (slash-separated), not just "114年7月24日" (kanji-separated) — `parseDate` originally only
+  handled the latter for ROC years, silently returning `null` for every date field on real documents; (3) OCR
+  output glues CJK characters together with stray spaces ("機關名稱" → "機 關 名 稱") and occasionally
+  misreads a character entirely ("名稱" → "名般") — the former is fixed by `collapseCjkSpacing`, the latter is
+  not fixable by this approach and is an accepted miss (returns `null`, doesn't guess); (4) a short/generic
+  label (e.g. "招標機關") can coincidentally appear mid-sentence in unrelated prose — `findLabelLines` now
+  only accepts a match within `LABEL_START_TOLERANCE` (20 chars) of its line's start, since a real form label
+  is always at/near the start of its line/cell.
+- Also tested against the freeform 統包工程需求書 (152K characters, no "label: value" structure at all,
+  multiple buildings each with their own floor count/area). Keyword matching produces outright wrong answers
+  here (wrong unit, wrong building, coincidental keyword matches), not just misses — confirmed this document
+  type is out of scope for this feature; see `CLAUDE.md`'s "招標文件自動判讀" section for what's actually a
+  reasonable target (a clean, structured 公開招標公告) versus not.
+**Consequence**: No LLM API dependency, no cost per extraction, but a materially lower and less consistent
+accuracy ceiling than the Anthropic version had — expected and accepted by the user as the tradeoff for
+avoiding an API dependency. Every extracted field is still a draft the user reviews before saving (unchanged
+from before), which is what makes shipping this accuracy tradeoff acceptable at all.

@@ -41,3 +41,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# tesseract.js OCR language data — downloaded on demand (see cachePath in extractText.ts), never
+# committed; a stray local run without cachePath set can drop these in the project root
+*.traineddata
+

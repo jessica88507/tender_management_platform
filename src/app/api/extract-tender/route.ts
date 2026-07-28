@@ -1,60 +1,22 @@
 import { NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@/auth";
+import { extractTenderText } from "@/lib/tenderExtract/extractText";
+import { parseTenderFields } from "@/lib/tenderExtract/parseFields";
 
-// Server-side only, by design: the original spec's tender-document auto-read feature called the
-// Anthropic API directly from client-side JS, which would ship the API key in the browser bundle.
-// This route holds the key server-side and the browser only ever talks to this route.
+// Rule-based (OCR + keyword/regex) extraction — no external AI API, so no per-request cost and no
+// API key to provision. Runs entirely inside this one serverless function: pdfjs-dist reads a
+// PDF's text layer directly (pure JS, no native deps), and tesseract.js OCRs plain image uploads
+// (ships its own WASM binary, no system Tesseract install needed) — both fit Vercel's serverless
+// Node runtime. See docs/DECISIONS.md for why this replaced the earlier Anthropic-API version and
+// what its accuracy trade-offs are.
 
 const MAX_FILES = 5;
 const MAX_FILE_BYTES = 15 * 1024 * 1024;
-
-const EXTRACT_PROMPT = `你是招標文件判讀助手。請閱讀以上文件內容，找出以下欄位的值，並「只」回傳一個 JSON 物件（不要包含任何其他文字或 markdown code fence）：
-{
-  "contractAmount": number | null,
-  "siteArea": number | null,
-  "floorArea": number | null,
-  "floorCount": string | null,
-  "tenderStart": string | null,
-  "deadline": string | null,
-  "ownerOrg": string | null,
-  "userUnit": string | null,
-  "location": string | null,
-  "contractMode": string | null,
-  "contractScope": string | null,
-  "supervisorUnit": string | null,
-  "buildingType": string | null,
-  "constructionPeriod": string | null,
-  "specialNotes": string | null
-}
-欄位說明：
-- contractAmount：契約金額／預算金額，單位為新台幣元的整數（例如 8500000000）
-- siteArea：基地面積，單位平方公尺的數字
-- floorArea：總樓地板面積，單位平方公尺的數字
-- floorCount：樓層描述文字，例如「地上12層/地下3層」
-- tenderStart：招標公告日期，格式 YYYY-MM-DD
-- deadline：投標截止日期時間，格式 YYYY-MM-DDTHH:mm
-- ownerOrg：業主（發包機關）名稱
-- userUnit：使用單位名稱
-- location：案址／基地地點文字描述
-- contractMode：契約模式，例如「統包，總價承攬」
-- contractScope：承攬範圍，例如「建築+機電工程+設計」
-- supervisorUnit：監造單位名稱（可能不只一個，用頓號或換行分隔）
-- buildingType：建築形式，例如「一幢三棟／地下3層地上14層」
-- constructionPeriod：合約工期文字描述，例如「決標後1500日竣工（50個月）」
-- specialNotes：特殊說明／認證要求列表，例如「特殊結構審查、綠建築銀級以上、智慧建築合格級以上」
-找不到的欄位請填 null，不要用猜測或編造的數字或文字，寧可留空。`;
+const SUPPORTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
 export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json(
-      { error: "伺服器尚未設定 ANTHROPIC_API_KEY，此功能目前無法使用，請聯繫系統管理員設定。" },
-      { status: 500 }
-    );
-  }
 
   const formData = await request.formData();
   const files = formData.getAll("files").filter((f): f is File => f instanceof File);
@@ -65,44 +27,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `一次最多上傳 ${MAX_FILES} 個檔案` }, { status: 400 });
   }
 
-  const contentBlocks: Anthropic.ContentBlockParam[] = [];
+  const tenderFiles = [];
   for (const file of files) {
     if (file.size > MAX_FILE_BYTES) {
       return NextResponse.json({ error: `檔案「${file.name}」超過 15MB 上限` }, { status: 400 });
     }
-    const base64 = Buffer.from(await file.arrayBuffer()).toString("base64");
-    if (file.type === "application/pdf") {
-      contentBlocks.push({
-        type: "document",
-        source: { type: "base64", media_type: "application/pdf", data: base64 },
-        title: file.name,
-      });
-    } else if (["image/jpeg", "image/png", "image/gif", "image/webp"].includes(file.type)) {
-      contentBlocks.push({
-        type: "image",
-        source: { type: "base64", media_type: file.type as "image/jpeg" | "image/png" | "image/gif" | "image/webp", data: base64 },
-      });
-    } else {
+    if (file.type !== "application/pdf" && !SUPPORTED_IMAGE_TYPES.includes(file.type)) {
       return NextResponse.json({ error: `不支援的檔案格式：${file.name}（僅支援 PDF 或圖片）` }, { status: 400 });
     }
+    const buffer = Buffer.from(await file.arrayBuffer());
+    tenderFiles.push({ buffer, mimeType: file.type, name: file.name });
   }
-  contentBlocks.push({ type: "text", text: EXTRACT_PROMPT });
 
   try {
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const message = await client.messages.create({
-      model: "claude-sonnet-5",
-      max_tokens: 1024,
-      messages: [{ role: "user", content: contentBlocks }],
-    });
-    const textBlock = message.content.find((b) => b.type === "text");
-    const raw = textBlock && "text" in textBlock ? textBlock.text : "";
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      return NextResponse.json({ error: "AI 無法判讀出結構化資料，請確認文件內容清晰可讀。" }, { status: 502 });
+    const { text, ocrPageCount } = await extractTenderText(tenderFiles);
+    if (!text.trim()) {
+      return NextResponse.json({ error: "無法從檔案中讀出任何文字，請確認檔案內容清晰可讀。" }, { status: 502 });
     }
-    const fields = JSON.parse(jsonMatch[0]);
-    return NextResponse.json({ fields });
+    const fields = parseTenderFields(text);
+    return NextResponse.json({ fields, ocrPageCount });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "文件判讀失敗，請稍後再試。" }, { status: 502 });

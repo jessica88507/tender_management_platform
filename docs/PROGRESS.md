@@ -5,6 +5,27 @@
 
 ---
 
+## 2026-07-28 — 招標文件自動判讀 rebuilt without an LLM API (branch `feature/ocr-tender-extraction`)
+
+- [x] Replaced the Anthropic-API-based extraction in `src/app/api/extract-tender/route.ts` with a rule-based
+      pipeline in new `src/lib/tenderExtract/` module: PDF text-layer read (`pdfjs-dist`) with a scanned-page
+      OCR fallback (`pdfjs-dist` render-to-PNG via `@napi-rs/canvas` + `tesseract.js`), then keyword/synonym +
+      regex field parsing. Removed `@anthropic-ai/sdk` and `ANTHROPIC_API_KEY` entirely. See `DECISIONS.md` #20.
+- [x] Validated against two real downloaded documents (not hand-written samples): a real 招標公告 (turned out
+      to be a scanned PDF — motivated the OCR fallback) and a real 統包工程需求書 (confirmed this document
+      type is out of scope for keyword extraction — freeform, no label:value structure, multiple buildings).
+      Found and fixed real bugs this surfaced: ROC dates written with slashes ("115/06/25") weren't parsed at
+      all; OCR glues CJK characters together with stray spaces; a short generic label can coincidentally match
+      mid-sentence in unrelated prose (now requires the match near its line's start).
+- [x] `tesseract.js`'s OCR language-data cache pinned to `/tmp` (the only writable path on Vercel's serverless
+      functions) — previously defaulted to the project's cwd, which is read-only there and, before that,
+      accidentally left 7MB of `.traineddata` files sitting in the repo root during local testing (now
+      gitignored too).
+- [ ] Known, accepted accuracy limits (not further pursued this round): a label whose text OCR misreads
+      (e.g. "機關名稱" → "機關名般") returns `null` rather than a guess; dense OCR'd tables where multiple
+      original rows get merged onto one text line can still produce an over-long/run-on value for some
+      fields. Both are documented in `CLAUDE.md` and `DECISIONS.md` #20.
+
 ## 2026-07-28 — Consultant edit/delete, 招標公告/投標截止 alert cleanup, mobile responsive fixes, font sizing
 
 - [x] Fixed 招標公告/投標截止 (milestone `collect`/`deadline`) still nagging as if they were overdue action

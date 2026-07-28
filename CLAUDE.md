@@ -206,14 +206,36 @@ migration — not a small targeted fix), follow this standing process rather tha
    large task list — do the work, verify it, and give one consolidated summary at the end. This matches how
    the project owner prefers to work (see `docs/MEMORY.md`).
 
-## 招標文件自動判讀 (`src/app/api/extract-tender`)
+## 招標文件自動判讀 (`src/app/api/extract-tender`, `src/lib/tenderExtract/`)
 
 The original HTML tool's tender-document auto-read feature called `api.anthropic.com` directly from
 client-side JS, which would've shipped an API key in the browser bundle — it was deliberately not ported
-that way. It's since been rebuilt properly: `InfoPanel`'s edit mode has a multi-file upload (PDF or images)
-that posts to `src/app/api/extract-tender/route.ts`, a server-side Route Handler that holds
-`ANTHROPIC_API_KEY` and calls the Anthropic SDK directly (PDF pages / images as native `document`/`image`
-content blocks, not client-side text extraction) to extract `contractAmount`/`siteArea`/`floorArea`/
-`floorCount`/`tenderStart`/`deadline` as JSON, which the client then merges into the draft case (user still
-reviews/edits before saving — nothing auto-saves). Requires `ANTHROPIC_API_KEY` in `.env` (get one from
-console.anthropic.com); without it, the route returns a clear error and every other feature is unaffected.
+that way. It was then rebuilt server-side calling the Anthropic API, and later (see `DECISIONS.md` #15-ish,
+the entries under "OCR tender extraction") **replaced again** with a rule-based OCR + keyword/regex pipeline —
+no external AI API, no API key, no per-request cost, at the cost of materially lower accuracy on anything
+that isn't a clean, structured tender-announcement form (see below).
+
+`InfoPanel`'s edit mode has a multi-file upload (PDF or images) that posts to
+`src/app/api/extract-tender/route.ts`, which calls `extractTenderText` (`src/lib/tenderExtract/extractText.ts`)
+then `parseTenderFields` (`src/lib/tenderExtract/parseFields.ts`):
+- `extractTenderText`: reads each PDF page's text layer directly via `pdfjs-dist` (fast, exact, no OCR needed
+  — most digitally-generated tender PDFs have one). Pages with little/no text layer (scanned documents, or a
+  browser "print to PDF" that rasterized each page as one image — both are common for real 招標公告 downloaded
+  from 政府電子採購網) get rendered to a PNG via `pdfjs-dist` + `@napi-rs/canvas` (prebuilt binaries, no native
+  build step, safe on Vercel) and OCR'd with `tesseract.js` (`chi_tra+eng`, ships its own WASM, no system
+  Tesseract install). Plain image uploads always go through OCR. `tesseract.js`'s `cachePath` is pinned to
+  `/tmp` — Vercel's serverless functions can't write anywhere else, and downloaded language data (~2-5MB per
+  language) gets refetched every cold start regardless since `/tmp` doesn't persist across invocations either.
+- `parseTenderFields`: keyword/synonym label matching + regex (ROC or Gregorian dates, 億/萬/元 money, m²
+  areas) — see the file's own comments for the label lists and known sharp edges (a label match only counts
+  near the start of its line, to avoid a generic label like "招標機關" matching mid-sentence in unrelated
+  prose; OCR text gets its inter-CJK-character spacing collapsed before matching).
+
+**Known accuracy limits, found by testing against real downloaded documents** (see `DECISIONS.md`): this
+reliably extracts most fields from a clean, single-project 政府電子採購網 "公開招標公告" print/export. It does
+**not** reliably handle long freeform technical specification documents (統包工程需求書 and similar) — those
+aren't a "label: value" form to begin with, and keyword matching has no way to know which of several numbers
+in a paragraph is the right one. It also can't recover a field whose label OCR misread (e.g. "機關名稱" →
+"機關名般") — this returns `null` in that case rather than guessing, matching the "leave it for the user to
+fill in" behavior the UI already expects. The user extracted fields are always a draft the user reviews/edits
+before saving — nothing auto-saves.

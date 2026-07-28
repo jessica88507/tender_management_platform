@@ -27,13 +27,7 @@
    - Exact dates for owner-side processes (公開招標/決選廠商/施工評選簡報 etc.) are still reverse-engineered
      from experience-based ratios.
 
-3. **Tender-document PDF auto-parsing not implemented**
-   - The original approach (calling the Anthropic API directly from the frontend) would expose an API key in
-     the browser — unsafe, deliberately not ported.
-   - If rebuilt, needs a backend API route (Next.js Route Handler) to proxy the call, with the key kept server-
-     side only — don't repeat the mistake of putting a key in frontend code.
-
-4. **PPTX export was deliberately not rebuilt** (the original spec explicitly says the user had it removed
+3. **PPTX export was deliberately not rebuilt** (the original spec explicitly says the user had it removed
    because running PptxGenJS in-browser caused crashes). If rebuilt later, the original spec recommends a real
    backend service or Claude Code's pptx skill — not a large library running in the browser.
 
