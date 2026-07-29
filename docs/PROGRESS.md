@@ -5,6 +5,14 @@
 
 ---
 
+## 2026-07-29 — Surfaced the real error in extract-tender's failure alert
+
+- [x] User retested on the deployed Vercel site and got a genuine failure ("文件判讀失敗，請稍後再試"),
+      confirming the request reaches the server and throws inside `extractTenderText`/`parseTenderFields` —
+      but the generic message gave no way to tell which. `route.ts`'s catch block now includes the caught
+      error's name/message directly in the response instead of a canned string, so the next test attempt
+      will show the actual cause without needing Vercel's function logs.
+
 ## 2026-07-29 — Fixed 招標文件自動判讀's false-success alert
 
 - [x] Found and fixed a real bug: the "已自動帶入判讀結果" success dialog fired on any 200 response, even
