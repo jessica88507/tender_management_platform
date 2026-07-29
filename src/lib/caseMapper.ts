@@ -26,6 +26,8 @@ type CaseRow = {
   buildingType: string;
   constructionPeriod: string;
   specialNotes: string;
+  architectTeamName: string;
+  extraTeamName: string;
   categoryOrder: string[] | null;
   createdByUserId: string | null;
   tasks: {
@@ -42,7 +44,7 @@ type CaseRow = {
     linkedTaskId: string | null;
     linkOffsetDays: number | null;
   }[];
-  teamMembers: { id: string; kind: "architect" | "mep"; name: string; sortIndex: number }[];
+  teamMembers: { id: string; kind: "architect" | "mep" | "extra"; name: string; sortIndex: number }[];
   consultants: {
     id: string;
     role: string;
@@ -50,7 +52,7 @@ type CaseRow = {
     contact: string;
     affiliation: string;
     isCustom: boolean;
-    teamGroup: "architect" | "jianguo" | null;
+    teamGroup: "architect" | "jianguo" | "extra" | null;
     sortIndex: number;
   }[];
   weekNotes: { weekStart: string; note: string }[];
@@ -92,6 +94,10 @@ export function rowToCase(row: CaseRow): Case {
     .filter((m) => m.kind === "mep")
     .sort((a, b) => a.sortIndex - b.sortIndex)
     .map((m) => m.name);
+  const extraMembers = row.teamMembers
+    .filter((m) => m.kind === "extra")
+    .sort((a, b) => a.sortIndex - b.sortIndex)
+    .map((m) => m.name);
 
   const weekNotes: Record<string, string> = {};
   row.weekNotes.forEach((w) => {
@@ -122,7 +128,7 @@ export function rowToCase(row: CaseRow): Case {
     specialNotes: row.specialNotes,
     categoryOrder: row.categoryOrder,
     weekNotes,
-    team: { architect, mep, consultants },
+    team: { architectName: row.architectTeamName, architect, mep, extraName: row.extraTeamName, extraMembers, consultants },
     tasks,
   };
 }

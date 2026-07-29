@@ -1,7 +1,7 @@
 import PptxGenJS from "pptxgenjs";
 import type { Case } from "./types";
 import { CATEGORIES } from "./constants";
-import { caseDaysLeft, caseProgress } from "./derived";
+import { caseProgress } from "./derived";
 import {
   buildAllMonthsCalendars,
   buildMilestoneList,
@@ -29,7 +29,13 @@ const COLOR = {
   paperLight: "F8F4EA",
   white: "FFFFFF",
   highlight: "B45309",
+  olive: "65A30D",
+  greyRow: "EFEBDD",
 };
+
+// Same conversion the web app's InfoPanel uses for 每坪造價/坪數換算 — kept in sync manually since
+// this file can't import a client component's local constant.
+const SQM_PER_PING = 3.305785;
 
 // Same hex values as the web app's light-theme `--color-*` category variables (globals.css) — the
 // calendar slide (buildCalendarSlide) mirrors CalendarView's category-color coding exactly, rather
@@ -63,8 +69,24 @@ const MILESTONE_STATUS_COLOR: Record<MilestoneStatus, string> = {
 function fmtDeadline(deadline: string) {
   return deadline.replace("T", " ");
 }
-function fmtMoney(n: number) {
-  return n ? `NT$ ${n.toLocaleString("zh-TW")}` : "—";
+// e.g. 2,890,000,000 -> "NTD 28.9億元" — matches the reference deck's contract-amount format.
+function fmtMoneyYi(n: number): string {
+  if (!n) return "—";
+  const yi = (n / 1e8).toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+  return `NTD ${yi}億元`;
+}
+// e.g. 6,576.27 -> "6,576.27㎡(1,989坪)"
+function fmtAreaWithPing(sqm: number): string {
+  if (!sqm) return "—";
+  const ping = sqm / SQM_PER_PING;
+  return `${sqm.toLocaleString(undefined, { maximumFractionDigits: 2 })}㎡(${Math.round(ping).toLocaleString()}坪)`;
+}
+// 契約金額 ÷ 總樓地板面積換算坪 — same formula as InfoPanel's 每坪造價 field, expressed in 萬/坪.
+function fmtCostPerPingWan(contractAmount: number, floorArea: number): string | null {
+  if (!contractAmount || !floorArea) return null;
+  const floorAreaPing = floorArea / SQM_PER_PING;
+  const costPerPing = contractAmount / floorAreaPing;
+  return `約 NTD ${(costPerPing / 10000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}萬/坪`;
 }
 
 const SLIDE_W = 13.33;
@@ -108,44 +130,42 @@ function addSectionTitle(slide: PptxGenJS.Slide, title: string, y: number) {
   addRule(slide, MARGIN_X, y + 0.5, CONTENT_W);
 }
 
-function statCard(
-  slide: PptxGenJS.Slide,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  label: string,
-  value: string,
-  sub?: string
-) {
-  slide.addShape("roundRect" as PptxGenJS.SHAPE_NAME, {
-    x,
-    y,
-    w,
-    h,
-    fill: { color: COLOR.paperLight },
-    line: { color: COLOR.lineGrey, width: 1 },
-    rectRadius: 0.05,
-  });
-  slide.addText(label, { x: x + 0.18, y: y + 0.1, w: w - 0.36, h: 0.25, fontFace: FONT, fontSize: 9.5, bold: true, color: COLOR.inkSoft });
-  slide.addText(value, { x: x + 0.18, y: y + 0.36, w: w - 0.36, h: 0.4, fontFace: FONT, fontSize: 15, bold: true, color: COLOR.ink });
-  if (sub) {
-    slide.addText(sub, { x: x + 0.18, y: y + 0.73, w: w - 0.36, h: 0.25, fontFace: FONT, fontSize: 9, color: COLOR.inkSoft });
-  }
-}
-
 // ---------- Slide 1: case info + team org chart ----------
 
 function addOrgChart(slide: PptxGenJS.Slide, c: Case, y: number, h: number) {
-  const branchW = (CONTENT_W - 0.6) / 2;
-  const leftX = MARGIN_X;
-  const rightX = MARGIN_X + branchW + 0.6;
-  const leftCenter = leftX + branchW / 2;
-  const rightCenter = rightX + branchW / 2;
+  const architectMembers = [
+    ...c.team.architect.filter(Boolean),
+    ...c.team.consultants.filter((x) => x.team === "architect").map((x) => `${x.role}（${x.contact || x.company || "未定"}）`),
+  ];
+  const jianguoMembers = [
+    ...c.team.mep.filter(Boolean),
+    ...c.team.consultants.filter((x) => x.team === "jianguo").map((x) => `${x.role}（${x.contact || x.company || "未定"}）`),
+  ];
+  const extraMembers = [
+    ...c.team.extraMembers.filter(Boolean),
+    ...c.team.consultants.filter((x) => x.team === "extra").map((x) => `${x.role}（${x.contact || x.company || "未定"}）`),
+  ];
+  // 建築師團隊's title is the partner firm's own name (a dedicated field, not derived from its
+  // member list) — same hierarchy level as 建國工程團隊, which is always the firm's own fixed
+  // in-house team. The 3rd branch is optional (e.g. a JV MEP company handling this case's 機電)
+  // and only renders when actually populated, so the default case still looks like a plain 2-way
+  // org chart.
+  const hasExtra = c.team.extraName.trim() !== "" || extraMembers.length > 0;
+  const branches: { title: string; names: string[] }[] = [
+    { title: c.team.architectName || "建築師團隊", names: architectMembers },
+    { title: "建國工程團隊", names: jianguoMembers },
+  ];
+  if (hasExtra) branches.push({ title: c.team.extraName || "第三團隊", names: extraMembers });
+
+  const n = branches.length;
+  const gap = n === 2 ? 0.6 : 0.35;
+  const branchW = (CONTENT_W - gap * (n - 1)) / n;
+  const branchX = branches.map((_, i) => MARGIN_X + i * (branchW + gap));
+  const centers = branchX.map((x) => x + branchW / 2);
 
   const rootW = 2.3;
   const rootH = 0.42;
-  const rootCenter = (leftCenter + rightCenter) / 2;
+  const rootCenter = (centers[0] + centers[centers.length - 1]) / 2;
   const rootY = y;
   const trunkY = rootY + rootH + 0.28;
   const branchY = trunkY + 0.28;
@@ -180,10 +200,11 @@ function addOrgChart(slide: PptxGenJS.Slide, c: Case, y: number, h: number) {
     h: trunkY - (rootY + rootH),
     line: { color: COLOR.lineGrey, width: 1.5 },
   });
-  // Horizontal trunk connecting both branches, plus stubs down into each branch box
-  addRule(slide, leftCenter, trunkY, rightCenter - leftCenter);
-  slide.addShape("line" as PptxGenJS.SHAPE_NAME, { x: leftCenter, y: trunkY, w: 0, h: branchY - trunkY, line: { color: COLOR.lineGrey, width: 1.5 } });
-  slide.addShape("line" as PptxGenJS.SHAPE_NAME, { x: rightCenter, y: trunkY, w: 0, h: branchY - trunkY, line: { color: COLOR.lineGrey, width: 1.5 } });
+  // Horizontal trunk connecting every branch's center, plus a stub down into each branch box
+  addRule(slide, centers[0], trunkY, centers[centers.length - 1] - centers[0]);
+  centers.forEach((cx) => {
+    slide.addShape("line" as PptxGenJS.SHAPE_NAME, { x: cx, y: trunkY, w: 0, h: branchY - trunkY, line: { color: COLOR.lineGrey, width: 1.5 } });
+  });
 
   const branchBox = (x: number, title: string, names: string[]) => {
     slide.addShape("roundRect" as PptxGenJS.SHAPE_NAME, {
@@ -218,72 +239,175 @@ function addOrgChart(slide: PptxGenJS.Slide, c: Case, y: number, h: number) {
     });
   };
 
-  const architectNames = [
-    ...c.team.architect.filter(Boolean),
-    ...c.team.mep.filter(Boolean),
-    ...c.team.consultants.filter((x) => x.team === "architect").map((x) => `${x.role}（${x.contact || x.company || "未定"}）`),
-  ];
-  const jianguoNames = c.team.consultants
-    .filter((x) => x.team === "jianguo")
-    .map((x) => `${x.role}（${x.contact || x.company || "未定"}）`);
+  branches.forEach((b, i) => branchBox(branchX[i], b.title, b.names));
+}
 
-  branchBox(leftX, "建築師團隊", architectNames);
-  branchBox(rightX, "建國工程團隊", jianguoNames);
+// Bilingual label/value cell helpers for the 案件基本資料 table — every label cell shares the same
+// olive treatment, every value cell alternates white/light-grey per row per the reference design.
+function labelCell(zh: string, en: string, opts?: Partial<PptxGenJS.TableCellProps>): PptxGenJS.TableCell {
+  return {
+    text: [
+      { text: zh, options: { bold: true, fontSize: 11, color: COLOR.white, breakLine: true } },
+      { text: en, options: { fontSize: 7.5, italic: true, color: COLOR.white } },
+    ],
+    options: { fill: { color: COLOR.olive }, valign: "middle", margin: [2, 6, 2, 6], ...opts },
+  };
+}
+function valueCell(
+  text: string | PptxGenJS.TableCell["text"],
+  bg: string,
+  opts?: Partial<PptxGenJS.TableCellProps>
+): PptxGenJS.TableCell {
+  return {
+    text: typeof text === "string" ? text : text,
+    options: {
+      fill: { color: bg },
+      valign: "middle",
+      fontSize: 11,
+      color: COLOR.ink,
+      margin: [2, 8, 2, 8],
+      ...opts,
+    },
+  };
 }
 
 function buildSlide1(pptx: PptxGenJS, c: Case, index: number, total: number) {
   const slide = pptx.addSlide();
-  addChrome(slide, c.name, index, total);
+  slide.background = { color: COLOR.white };
 
-  const daysLeft = caseDaysLeft(c);
-  slide.addText(c.name, {
-    x: MARGIN_X,
-    y: 0.65,
-    w: CONTENT_W,
-    h: 0.6,
-    fontFace: FONT,
-    fontSize: 24,
-    bold: true,
-    color: COLOR.ink,
-    valign: "top",
+  // Header: olive "01" numeral block + bilingual title, orange 案件基本資料 tab top-right.
+  slide.addShape("rect" as PptxGenJS.SHAPE_NAME, { x: 0, y: 0, w: 1.7, h: 1.35, fill: { color: COLOR.olive }, line: { type: "none" } });
+  slide.addText("01", { x: 0, y: 0, w: 1.7, h: 1.35, fontFace: FONT, fontSize: 40, bold: true, color: COLOR.white, align: "center", valign: "middle" });
+  slide.addText("案件介紹", { x: 2.05, y: 0.18, w: 6, h: 0.55, fontFace: FONT, fontSize: 25, bold: true, color: COLOR.ink });
+  slide.addText("Project Introduction", { x: 2.08, y: 0.75, w: 6, h: 0.35, fontFace: FONT, fontSize: 12, italic: true, color: COLOR.inkSoft });
+  slide.addShape("rect" as PptxGenJS.SHAPE_NAME, {
+    x: SLIDE_W - 2.9,
+    y: 0,
+    w: 2.9,
+    h: 0.55,
+    fill: { color: COLOR.highlight },
+    line: { type: "none" },
   });
-  slide.addText(
+  slide.addText("案件基本資料", { x: SLIDE_W - 2.9, y: 0, w: 2.9, h: 0.55, fontFace: FONT, fontSize: 14, bold: true, color: COLOR.white, align: "center", valign: "middle" });
+  slide.addText(`${index} / ${total}`, {
+    x: SLIDE_W - MARGIN_X - 1.5,
+    y: 0.62,
+    w: 1.5,
+    h: 0.3,
+    fontFace: FONT,
+    fontSize: 9,
+    color: COLOR.inkSoft,
+    align: "right",
+  });
+
+  const costPerPing = fmtCostPerPingWan(c.contractAmount, c.floorArea);
+  const tableY = 1.55;
+  const tableH = SLIDE_H - 0.3 - tableY;
+  const labelW = CONTENT_W * 0.14;
+  const valueW = CONTENT_W * 0.36;
+  const rowH = [0.5, 0.7, 0.75, 0.65, 0.65, 0.75, 0.75, tableH - (0.5 + 0.7 + 0.75 + 0.65 + 0.65 + 0.75 + 0.75)];
+
+  const rows: PptxGenJS.TableRow[] = [
     [
-      { text: "主投標手：", options: { color: COLOR.inkSoft, fontSize: 12, fontFace: FONT } },
-      { text: `${c.bidLead || "—"}     `, options: { color: COLOR.ink, bold: true, fontSize: 12, fontFace: FONT } },
-      { text: "投標截止：", options: { color: COLOR.inkSoft, fontSize: 12, fontFace: FONT } },
-      { text: `${fmtDeadline(c.deadline)}     `, options: { color: COLOR.ink, bold: true, fontSize: 12, fontFace: FONT } },
-      { text: "剩餘天數：", options: { color: COLOR.inkSoft, fontSize: 12, fontFace: FONT } },
-      {
-        text: daysLeft >= 0 ? `${daysLeft} 天` : `已逾期 ${-daysLeft} 天`,
-        options: { color: daysLeft < 0 ? COLOR.danger : COLOR.chopRed, bold: true, fontSize: 12, fontFace: FONT },
-      },
+      { text: [{ text: "工程名稱", options: { bold: true, fontSize: 11, color: COLOR.white, breakLine: true } }, { text: "Project Name", options: { fontSize: 7.5, italic: true, color: COLOR.white } }], options: { fill: { color: COLOR.ink }, valign: "middle", margin: [2, 6, 2, 6] } },
+      { text: c.name, options: { fill: { color: COLOR.ink }, valign: "middle", fontSize: 15, bold: true, color: COLOR.white, margin: [2, 8, 2, 8], colspan: 3 } },
     ],
-    { x: MARGIN_X, y: 1.3, w: CONTENT_W, h: 0.35 }
-  );
+    [
+      labelCell("業主", "Owner"),
+      valueCell(c.ownerOrg || "—", COLOR.white),
+      labelCell("使用單位", "User"),
+      valueCell(c.userUnit || "—", COLOR.white),
+    ],
+    [
+      labelCell("契約金額", "Contract Amount"),
+      valueCell(
+        costPerPing
+          ? [
+              { text: fmtMoneyYi(c.contractAmount), options: { breakLine: true } },
+              { text: costPerPing, options: { color: COLOR.chopRed, bold: true, fontSize: 10 } },
+            ]
+          : fmtMoneyYi(c.contractAmount),
+        COLOR.greyRow
+      ),
+      labelCell("地點", "Location"),
+      valueCell(c.location || "—", COLOR.greyRow),
+    ],
+    [
+      labelCell("契約模式", "Contract Mode"),
+      valueCell(c.contractMode || "—", COLOR.white),
+      labelCell("承攬範圍", "Contract Scope"),
+      valueCell(c.contractScope || "—", COLOR.white),
+    ],
+    [
+      labelCell("監造單位", "ISE"),
+      valueCell(c.supervisorUnit || "—", COLOR.greyRow),
+      labelCell("基地面積", "Site Area"),
+      valueCell(`基地 ${fmtAreaWithPing(c.siteArea)}`, COLOR.greyRow),
+    ],
+    [
+      labelCell("建築形式", "Type"),
+      valueCell(
+        c.floorCount ? [{ text: c.buildingType || "—", options: { breakLine: true } }, { text: c.floorCount, options: { color: COLOR.chopRed, bold: true } }] : c.buildingType || "—",
+        COLOR.white
+      ),
+      labelCell("樓地板面積", "Total Floor Area"),
+      valueCell(fmtAreaWithPing(c.floorArea), COLOR.white),
+    ],
+    [
+      labelCell("合約工期", "Construction Period"),
+      valueCell(c.constructionPeriod || "—", COLOR.greyRow),
+      labelCell("招標時間", "Tender Schedule"),
+      valueCell(
+        [
+          { text: `公告日期：${c.start || "—"}`, options: { breakLine: true, fontSize: 10 } },
+          { text: `截止日期：${fmtDeadline(c.deadline)}`, options: { fontSize: 10 } },
+        ],
+        COLOR.greyRow
+      ),
+    ],
+    [
+      labelCell("特殊說明", "Special Notes"),
+      valueCell(
+        c.specialNotes
+          ? c.specialNotes
+              .split("\n")
+              .filter((line) => line.trim())
+              .flatMap((line, i, arr) => [
+                { text: "● ", options: { color: COLOR.highlight, bold: true } },
+                { text: line.trim(), options: { breakLine: i < arr.length - 1 } },
+              ])
+          : "—",
+        COLOR.white,
+        { colspan: 3, fontSize: 10.5, valign: "top", margin: [8, 8, 4, 8] }
+      ),
+    ],
+  ];
 
-  const cardW = (CONTENT_W - 0.6) / 4;
-  const cardY = 1.8;
-  statCard(slide, MARGIN_X, cardY, cardW, 0.95, "契約金額", fmtMoney(c.contractAmount));
-  statCard(slide, MARGIN_X + (cardW + 0.2) * 1, cardY, cardW, 0.95, "基地面積", c.siteArea ? `${c.siteArea.toLocaleString("zh-TW")} m²` : "—");
-  statCard(
-    slide,
-    MARGIN_X + (cardW + 0.2) * 2,
-    cardY,
-    cardW,
-    0.95,
-    "樓地板面積",
-    c.floorArea ? `${c.floorArea.toLocaleString("zh-TW")} m²` : "—"
-  );
-  statCard(slide, MARGIN_X + (cardW + 0.2) * 3, cardY, cardW, 0.95, "預計設計樓層", c.floorCount || "—");
-
-  addSectionTitle(slide, "備標團隊組織圖", 3.05);
-  addOrgChart(slide, c, 3.75, SLIDE_H - 0.3 - 3.75);
+  slide.addTable(rows, {
+    x: MARGIN_X,
+    y: tableY,
+    w: CONTENT_W,
+    h: tableH,
+    fontFace: FONT,
+    border: { type: "solid", color: COLOR.lineGrey, pt: 0.75 },
+    autoPage: false,
+    colW: [labelW, valueW, labelW, valueW],
+    rowH,
+  });
 }
 
-// ---------- Slide 2: progress + milestone list ----------
+// ---------- Slide 2: 備標團隊組織圖 ----------
 
-function buildSlide2(pptx: PptxGenJS, c: Case, index: number, total: number) {
+function buildOrgChartSlide(pptx: PptxGenJS, c: Case, index: number, total: number) {
+  const slide = pptx.addSlide();
+  addChrome(slide, c.name, index, total);
+  addSectionTitle(slide, "備標團隊組織圖", 0.7);
+  addOrgChart(slide, c, 1.5, SLIDE_H - 0.3 - 1.5);
+}
+
+// ---------- Slide 3: progress + milestone list ----------
+
+function buildProgressSlide(pptx: PptxGenJS, c: Case, index: number, total: number) {
   const slide = pptx.addSlide();
   addChrome(slide, c.name, index, total);
   addSectionTitle(slide, "整體進度", 0.7);
@@ -383,9 +507,16 @@ function buildCalendarSlide(
   const tableY = 1.45;
   const tableH = SLIDE_H - 0.35 - tableY;
 
-  const weekdayHeader: PptxGenJS.TableRow = ["日", "一", "二", "三", "四", "五", "六"].map((d) => ({
+  // Calendar-grid font sizes are 15% larger than the rest of the deck's chrome, per explicit
+  // request — easier to read when projected. `F` (fontSize) applies the scale inline everywhere
+  // below rather than hand-multiplying each literal.
+  const F = (n: number) => Math.round(n * 1.15 * 100) / 100;
+
+  const noteW = leftW * 0.2;
+  const dayW = (leftW - noteW) / 7;
+  const weekdayHeader: PptxGenJS.TableRow = [..."日一二三四五六".split(""), "本週目標/備註"].map((d) => ({
     text: d,
-    options: { bold: true, fill: { color: COLOR.skyPale }, color: COLOR.inkSoft, fontSize: 10, align: "center" },
+    options: { bold: true, fill: { color: COLOR.skyPale }, color: COLOR.inkSoft, fontSize: F(10), align: "center" },
   }));
   const MAX_TASKS_PER_CELL = 3;
   // Mirrors CalendarView's day cell exactly, not a text summary of it: each task gets a coloured
@@ -395,39 +526,45 @@ function buildCalendarSlide(
   // visually readable at a glance, the exact complaint about the old plain-text version.
   const dayCellRuns = (day: CalendarDay): PptxGenJS.TableCell[] => {
     const dateColor = day.inMonth ? COLOR.inkSoft : COLOR.lineGrey;
-    const runs: PptxGenJS.TableCell[] = [{ text: `${day.date}`, options: { color: dateColor, bold: true, fontSize: 9, breakLine: true } }];
+    const runs: PptxGenJS.TableCell[] = [{ text: `${day.date}`, options: { color: dateColor, bold: true, fontSize: F(9), breakLine: true } }];
     const visible = day.tasks.slice(0, MAX_TASKS_PER_CELL);
     const hidden = day.tasks.length - visible.length;
     visible.forEach((t) => {
       if (t.milestone) {
-        runs.push({ text: "★ ", options: { color: t.done ? COLOR.lineGrey : COLOR.highlight, bold: true, fontSize: 8 } });
+        runs.push({ text: "★ ", options: { color: t.done ? COLOR.lineGrey : COLOR.highlight, bold: true, fontSize: F(8) } });
         runs.push({
           text: t.label,
-          options: { color: t.done ? COLOR.lineGrey : COLOR.ink, bold: true, fontSize: 8, breakLine: true },
+          options: { color: t.done ? COLOR.lineGrey : COLOR.ink, bold: true, fontSize: F(8), breakLine: true },
         });
       } else {
-        runs.push({ text: "● ", options: { color: t.done ? COLOR.lineGrey : CATEGORY_HEX[t.cat] ?? COLOR.inkSoft, fontSize: 8 } });
+        runs.push({ text: "● ", options: { color: t.done ? COLOR.lineGrey : CATEGORY_HEX[t.cat] ?? COLOR.inkSoft, fontSize: F(8) } });
         runs.push({
           text: t.label,
-          options: { color: t.done ? COLOR.lineGrey : COLOR.inkSoft, fontSize: 8, breakLine: true },
+          options: { color: t.done ? COLOR.lineGrey : COLOR.inkSoft, fontSize: F(8), breakLine: true },
         });
       }
     });
     if (hidden > 0) {
-      runs.push({ text: `+${hidden} 項`, options: { color: COLOR.inkSoft, italic: true, fontSize: 8, breakLine: true } });
+      runs.push({ text: `+${hidden} 項`, options: { color: COLOR.inkSoft, italic: true, fontSize: F(8), breakLine: true } });
     }
     return runs;
   };
-  const calRows: PptxGenJS.TableRow[] = calMonth.weeks.map((week) =>
-    week.map((day) => ({
+  // Same weekKey convention as CalendarView.tsx (the ISO date of the week's leading Sunday) so the
+  // note the user typed into the web app's 本週目標/備註 box shows up on the matching week row here.
+  const calRows: PptxGenJS.TableRow[] = calMonth.weeks.map((week) => [
+    ...week.map((day) => ({
       text: dayCellRuns(day),
       options: {
         fill: { color: day.isToday ? "DCEBE3" : COLOR.white },
         align: "left" as const,
         valign: "top" as const,
       },
-    }))
-  );
+    })),
+    {
+      text: c.weekNotes[week[0].iso] || "",
+      options: { fill: { color: COLOR.paperLight }, align: "left" as const, valign: "top" as const, fontSize: F(8), color: COLOR.inkSoft },
+    },
+  ]);
   slide.addTable([weekdayHeader, ...calRows], {
     x: MARGIN_X,
     y: tableY,
@@ -436,6 +573,7 @@ function buildCalendarSlide(
     fontFace: FONT,
     border: { type: "solid", color: COLOR.lineGrey, pt: 0.5 },
     autoPage: false,
+    colW: [...Array(7).fill(dayW), noteW],
     rowH: [0.3, ...calMonth.weeks.map(() => (tableH - 0.3) / calMonth.weeks.length)],
   });
 
@@ -493,12 +631,13 @@ export async function buildProjectPptx(c: Case): Promise<Buffer> {
 
   const calendarMonths = buildAllMonthsCalendars(c);
   const overdue = overdueTasks(c);
-  const TOTAL = 2 + calendarMonths.length;
+  const TOTAL = 3 + calendarMonths.length;
 
   buildSlide1(pptx, c, 1, TOTAL);
-  buildSlide2(pptx, c, 2, TOTAL);
+  buildOrgChartSlide(pptx, c, 2, TOTAL);
+  buildProgressSlide(pptx, c, 3, TOTAL);
   calendarMonths.forEach((calMonth, i) => {
-    buildCalendarSlide(pptx, c, calMonth, overdue, 3 + i, TOTAL);
+    buildCalendarSlide(pptx, c, calMonth, overdue, 4 + i, TOTAL);
   });
 
   const buffer = await pptx.write({ outputType: "nodebuffer" });

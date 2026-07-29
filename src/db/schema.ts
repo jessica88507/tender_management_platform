@@ -79,8 +79,8 @@ export const verificationTokens = pgTable(
 
 // ---------- Domain ----------
 
-export const teamGroupEnum = pgEnum("team_group", ["architect", "jianguo"]);
-export const simpleTeamKindEnum = pgEnum("simple_team_kind", ["architect", "mep"]);
+export const teamGroupEnum = pgEnum("team_group", ["architect", "jianguo", "extra"]);
+export const simpleTeamKindEnum = pgEnum("simple_team_kind", ["architect", "mep", "extra"]);
 
 export const cases = pgTable(
   "cases",
@@ -117,6 +117,12 @@ export const cases = pgTable(
     buildingType: text("building_type").notNull().default(""), // 建築形式（棟數／地上地下層數）
     constructionPeriod: text("construction_period").notNull().default(""), // 合約工期
     specialNotes: text("special_notes").notNull().default(""), // 特殊說明（認證／審查等）
+
+    // 備標團隊組織圖 branch titles — single per-case strings, not repeatable rows, so they live
+    // here rather than in `teamMembers`. Empty `extraTeamName` (with no `extra`-kind teamMembers
+    // either) means the optional 3rd branch simply isn't shown.
+    architectTeamName: text("architect_team_name").notNull().default(""),
+    extraTeamName: text("extra_team_name").notNull().default(""),
 
     // User-customized display order of task categories (A–F) in 任務清單, drag-reordered as
     // whole blocks. Null/absent means "use the default CATEGORIES order" (see ListView.tsx).

@@ -445,3 +445,220 @@ the right instead of splitting it evenly.
 **Decision**: Added `mx-auto` to that wrapper. Verified at a 1920px viewport: left and right gaps both measured
 exactly 225px (`main`'s available width 1690px − content's 1240px, split /2) — confirms it's now centered, not
 just "less obviously wrong."
+**Superseded by #29 below** in the same conversation — the user then asked for the content to grow with the
+screen instead of being capped, so the `max-w-[1240px] mx-auto` from this entry was removed entirely.
+
+## 29. Main content column made fully fluid-width instead of capped+centered
+
+**Context**: Immediately after #28 shipped, the user clarified the actual ask was for the app's content boxes
+to grow with the screen size ("跟著螢幕大小長開，不要固定框框"), not just be centered within a fixed cap.
+**Decision**: Removed `max-w-[1240px] mx-auto` from `MainView.tsx`'s content wrapper entirely, leaving only the
+existing responsive padding (`py-5 px-4 pb-10 sm:py-8 sm:px-11 sm:pb-15`) — the content now fills whatever width
+`<main>` has, with no upper cap.
+**Consequence**: On very wide monitors, cards/tables/forms inside `CaseView` now stretch further than the old
+1240px cap. None of those components had a max-width or fixed-width assumption of their own, so nothing broke;
+if a future component genuinely needs a readable-line-length cap (e.g. a long-form text block), that should be
+scoped to that component specifically rather than reintroduced at the `MainView` level.
+
+## 30. Theme default reverted to always-light everywhere; login screen left untouched
+
+**Context**: Mid-session, the user asked for the login screen to guess dark/light from the OS/browser setting
+before a session is known, defaulting to light when unknown. This was implemented (`layout.tsx`'s blocking
+`beforeInteractive` script + `ClientApp.tsx`'s theme-sync effect both switched to `matchMedia('(prefers-color-
+scheme: dark)')`). While investigating how that would look, discovered `LoginScreen.tsx` doesn't actually
+consume the app's `data-theme` CSS-variable system at all — it's a fixed dark "sci-fi/BIGMASTER" brand design
+built from hardcoded hex colors, so the OS-guess work would never have been visible there anyway. Flagged this
+correction to the user explicitly rather than letting the earlier explanation stand uncorrected.
+**Decision** (user's explicit call once informed): keep the login screen exactly as-is — it does not participate
+in the theme system and never should. For the rest of the app, light is always the default (both before and
+after login, for any user without a saved preference); dark mode is reachable only via the in-app toggle a
+signed-in user clicks themselves, never guessed from the OS setting. Reverted `layout.tsx`'s init script back to
+unconditionally setting `data-theme="light"`, and `ClientApp.tsx`'s effect back to reading only the signed-in
+user's own `localStorage` preference (falling back to light, not `matchMedia`).
+**Consequence**: The OS-preference-guessing code was net-zero — implemented and reverted within the same
+session before being committed — so there's nothing left to clean up on `main`; this entry exists mainly to
+record that the OS-guess approach was deliberately rejected, not simply forgotten, should it come up again.
+
+## 31. PPT slide 1 rebuilt as a bilingual 案件基本資料 info table; org chart split into its own slide
+
+**Context**: The user supplied a reference image of the firm's actual bid-proposal deck cover slide and asked
+for the exported PPT's first slide to match it exactly ("請按照這樣的設計去放"): an "01 案件介紹 / Project
+Introduction" header with an orange "案件基本資料" tab, below which sits a bilingual (Chinese/English) 2-column
+key-value table — olive-green label cells, alternating white/light-grey data rows, a full-width dark 工程名稱
+header row, and a full-width orange-bulleted 特殊說明 list at the bottom. The old slide 1 (case name + 4 stat
+cards + org chart crammed into the same slide) didn't resemble this at all, and the user separately asked for
+the org chart to become its own second slide ("第二張是備標團隊的組織圖").
+**Decision**: Rewrote `buildSlide1` in `buildPptx.ts` as a `pptxgenjs` table using `colspan` for the full-width
+rows and paired label/value cells (via new `labelCell`/`valueCell` helpers) for the rest, sourcing every value
+directly from existing `Case` fields (`ownerOrg`, `userUnit`, `contractAmount`, `location`, `contractMode`,
+`contractScope`, `supervisorUnit`, `siteArea`, `buildingType`, `floorCount`, `floorArea`, `constructionPeriod`,
+`start`/`deadline`, `specialNotes`) rather than inventing new fields — no field in the reference image lacked a
+real data source except the reference's example household-count parenthetical, which was left out since no
+`Case` field backs it (fabricating a number would be worse than omitting it). Added `fmtMoneyYi` (億-based
+contract amount), `fmtAreaWithPing` (㎡ value with a `(N坪)` conversion), and `fmtCostPerPingWan` (the existing
+每坪造價 formula from `InfoPanel`, expressed in NTD萬/坪ordinal and shown in red under the contract amount,
+matching the reference image's red sub-line) as new pure helpers in this file. `addOrgChart` (unchanged) moved
+out of `buildSlide1` into a new `buildOrgChartSlide` function, and `buildProjectPptx` was renumbered:
+`TOTAL = 3 + calendarMonths.length`, with slide 1 = info table, slide 2 = org chart, slide 3 = progress/
+milestones (renamed from `buildSlide2` to `buildProgressSlide` for clarity), slides 4+ = one per calendar month.
+**Verification**: generated a real PPTX from a synthetic case via a direct `tsx` script (bypassing HTTP/auth,
+same method as decision #27), unzipped it, and grepped the slide XML — confirmed slide 1 contains every field's
+Chinese+English label pair and correctly-formatted value (e.g. `NTD 28.9億元` / `約 NTD 21.23萬/坪` / `基地
+6,576.27㎡(1,989坪)`), confirmed the expected `srgbClr` hex values for the olive label cells / orange tab / red
+sub-line / alternating grey rows all appear, and confirmed slide 2 now contains only the org chart while slide 3
+contains the progress bar + milestone table (previously slide 1 and slide 2 respectively).
+
+## 32. PPT calendar slide fonts scaled +15%; added 本週目標/備註 column
+
+**Context**: The user asked for the exported calendar's font sizes to be 15% larger for readability, and
+pointed out a missing 8th column, "本週目標/備註", that exists in the web app's `CalendarView` (backed by
+`c.weekNotes[weekKey]`) but was never carried over to the PPT version.
+**Decision**: Added a local `F(n) = round(n * 1.15 * 100) / 100` helper inside `buildCalendarSlide` and applied
+it to every font size specific to the calendar grid itself (weekday header, date numbers, task bullets/labels,
+the "+N 項" overflow note) — deliberately *not* to the shared chrome (`addChrome`/`addSectionTitle`, used by
+every slide type) or the 逾期事項 sidebar, since the user's request was specifically about "行事曆的產出" (the
+calendar grid's own output), not the whole deck. For the new column: `CalendarView.tsx` computes each week's
+`weekKey` as `toISO()` of that week's leading Sunday and looks up `c.weekNotes[weekKey]` — `reportData.ts`'s
+`buildMonthGrid` already produces weeks as arrays of 7 `CalendarDay`s starting from that same Sunday, so
+`week[0].iso` is already the identical key with no new plumbing needed in `reportData.ts`. Added an 8th column
+(`colW` now `[...7 day columns, wider note column]`) to both the header row and each week's row, pulling
+`c.weekNotes[week[0].iso] || ""` directly.
+**Verification**: same direct-script + unzip/grep method — confirmed `sz="1150"`/`"1035"`/`"920"` (10/9/8 × 1.15)
+appear in the calendar slide XML where the old `"1000"`/`"900"`/`"800"` values used to be, confirmed the header
+row's 8th cell reads "本週目標/備註", and confirmed two test notes seeded at different weeks (`2026-06-14`,
+`2026-07-05`) each landed on the correct month's slide.
+
+## 33. 招標文件自動判讀 route given an explicit 60s `maxDuration`
+
+**Context**: The user reported the upload/auto-extract feature still failing after testing again — this time
+confirmed to be on the deployed Vercel URL specifically (a local test of the same real document had already
+succeeded earlier this session). OCR via `tesseract.js` can take 7-9+ seconds per scanned page, and
+`tesseract.js` re-downloads its `chi_tra+eng` language data on every cold start (its `cachePath` is pinned to
+`/tmp`, which Vercel doesn't persist between invocations) — a multi-page scanned upload can plausibly exceed
+Vercel's serverless function default timeout well before extraction finishes, which would surface to the user
+as exactly this kind of generic "can't recognize the document" failure.
+**Decision**: Added `export const maxDuration = 60;` to `src/app/api/extract-tender/route.ts`. This doesn't
+rule out other causes (e.g. `@napi-rs/canvas`'s prebuilt binary needing to match Vercel's Lambda platform), but
+it's a real, verifiable gap in the code as it stood, and removing it costs nothing. If the user still sees the
+failure after their next deploy, the next step is pulling the actual error from Vercel's function runtime logs
+(Project → Logs), since that's the only way to see what's actually thrown in that environment — it can't be
+reproduced locally.
+
+## 34. Architect org-chart branch is titled by the partner firm's name, not a fixed label; mep/jianguo mismatch fixed
+
+**Context**: The user clarified their earlier garbled message: on the 備標團隊 org chart, they want the
+architect branch's box to be titled with whichever architecture firm/person they typed in (the first name
+entered under 建築師), sitting at the same hierarchy level as 建國工程團隊 — not nested as just another member
+card underneath a permanently generic "建築師團隊" label. Unlike the architect branch, 建國工程團隊 is the
+firm's own fixed in-house team and correctly stays a constant label. While implementing this, found a real
+pre-existing bug in `buildPptx.ts`'s `addOrgChart`: it merged `c.team.mep` into the *architect* branch's member
+list and left the jianguo branch showing only `team=jianguo` consultants — inconsistent with `TeamPanel.tsx`'s
+own web-app rendering (architect branch = `team.architect` + `team=architect` consultants; jianguo branch =
+`team.mep` + `team=jianguo` consultants). MEP staff were silently appearing under the wrong branch in every
+exported deck.
+**Decision**: In both `TeamPanel.tsx` (the web org-chart display) and `buildPptx.ts`'s `addOrgChart`, the
+architect branch's title is now `c.team.architect.filter(Boolean)[0]` (falling back to the generic "建築師團隊"
+label when empty), with any remaining architect names + `team=architect` consultants listed as members below
+it. Fixed the mep/jianguo mismatch in the same pass so `c.team.mep` now correctly feeds the jianguo branch in
+the PPT, matching the web app. Added a placeholder hint ("建築師團隊名稱（例如：OO建築師事務所）") on the first
+architect-name input in `TeamPanel`'s edit form, plus a one-line explanation, so it's clear why that first entry
+is treated specially.
+**Verification**: `npx tsc --noEmit` and `npx eslint` clean on both files. Regenerated the test PPTX (same
+direct-script method) with `team.architect: ["李工程師", "陳建築師"]` and `team.mep: ["張技師"]` — confirmed
+slide 2's left box is now titled "李工程師" (not "建築師團隊") with "陳建築師、結構技師（…）" listed beneath it,
+and the right box ("建國工程團隊") now correctly includes "張技師" alongside the jianguo consultant, where it
+was previously missing entirely.
+**Superseded by #35 below** in the very next message — the user clarified the "first name = title" hack (the
+UX hint I added in #34) still put a case-specific team name inside a section headed by a fixed, generic
+"建築師團隊" label, which read as an odd hierarchy; they wanted a properly separate field instead.
+
+## 35. Login screen switched to light theme; architect team gets a dedicated name field; org chart supports an optional 3rd branch
+
+**Context**: Three related asks in one message. (1) The user reversed an earlier decision and now wants
+`LoginScreen.tsx` in light theme (previously explicitly "don't touch it," kept as a fixed dark brand design —
+see decision #30). (2) Screenshot feedback on #34's "first array entry becomes the org-chart title" hack: the
+user found the resulting hierarchy confusing — the edit box is still headed by the fixed "建築師團隊" label
+while one particular input inside it silently becomes a different, more prominent title elsewhere (the org
+chart) — and asked for one dedicated input for the architect team's name, positioned outside/above that member
+list rather than nested inside it. (3) 機電團隊 is sometimes an external JV company that's also entrusted with
+work on the case, so the user wants 備標團隊's second tier to support up to 3 branches instead of a hardcoded 2 —
+but when there's no JV company, nothing should change (機電 keeps folding into 建國工程團隊 as it already does).
+
+**Decision**:
+- `LoginScreen.tsx` recolored from its hardcoded dark palette to the equivalent hardcoded **light** hex values
+  taken directly from `globals.css`'s light-theme `--color-*` variables (e.g. background `#050b12`→`#f1f5f9`,
+  accent `#38bdf8`→`#0284c7`) — same structure/motifs (compass badge, corner brackets, blueprint grid, scanning
+  line), just recolored. Still not wired to `data-theme` (this screen renders before a session — and therefore
+  a saved preference — exists), consistent with the app's own light-by-default behavior (#30).
+- Added `architectName: string` to `Team` (`types.ts`), backed by a new `cases.architect_team_name` column
+  (not `teamMembers`, since it's one string per case, not a repeatable list) — the org-chart title for the
+  architect branch now reads from this dedicated field, never from `architect[0]`. `TeamPanel.tsx` gained a
+  standalone labelled input for it, placed *above* the two team-box row (not nested inside the 建築師團隊 box),
+  with inline copy explaining it mirrors 建國工程團隊's hierarchy level.
+- Extended `TeamGroup` to `"architect" | "jianguo" | "extra" | null` and added `extraName: string` /
+  `extraMembers: string[]` to `Team`, backed by a new `cases.extra_team_name` column and a 3rd `"extra"` value
+  on both the `team_group` and `simple_team_kind` Postgres enums (`ALTER TYPE ... ADD VALUE`, migration
+  `drizzle/0010_bumpy_rumiko_fujikawa.sql`). The 3rd branch is opt-in in `TeamPanel.tsx`: a "+ 新增第三個團隊"
+  button reveals a self-contained box (its own name field + member list + consultant drag-drop target) only
+  when clicked, with a "移除此團隊" action that clears `extraName`/`extraMembers` and un-assigns any
+  `team === "extra"` consultants back to unclassified. `buildPptx.ts`'s `addOrgChart` was generalized from a
+  hardcoded 2-box layout to an N-box layout (`branches: {title, names}[]`, N = 2 or 3) so the same optional
+  branch renders in the exported deck; the 2-branch gap (0.6") is kept for the default case so a case with no
+  JV team looks pixel-identical to before, with a tighter 0.35" gap only when a 3rd box is present.
+- Every other reference to the team model (`normalizeTeam`, `getOwnerOptions` in `scheduler.ts`, `caseMapper.ts`,
+  both `POST`/`PATCH /api/cases` routes, `db/seed.ts`) updated in the same pass — see the full map an Explore
+  agent produced before this change, confirming exactly two Postgres enums (`team_group`, 2 values;
+  `simple_team_kind`, 2 values) and no runtime/zod validation anywhere in the API layer (enforcement is
+  entirely the Postgres enum constraint) were the only hard constraints on adding a 3rd value.
+**Verification**: `npx tsc --noEmit` and `npx eslint` clean across the whole project. Ran the real migration
+against the local `docker compose` Postgres (`npm run db:generate` + `db:migrate`) and reseeded. Regenerated
+the direct-script test PPTX for both a 2-branch case and a 3-branch (JV MEP) case — confirmed the JV branch only
+appears in the latter, with its own title/members, and the default case's layout is unchanged. Logged into the
+running dev server as the demo account and drove the real `TeamPanel` UI end-to-end: confirmed the light login
+screen, confirmed the standalone architect-name field renders above (not inside) the member-list box, added and
+then removed a 3rd team live and watched the org chart go from 2→3→2 branches correctly, then reverted the test
+edits so no test data was left on the (real, non-demo) case used for the walkthrough.
+**Superseded by #36 below**, in the very next message — the standalone field from this entry was itself the
+thing the user objected to.
+
+## 36. Architect/3rd-team names edited inline in their own box header, not a separate field; 3rd-team slot sits in the same row
+
+**Context**: Sharp, immediate pushback on #35's standalone "建築師團隊名稱" box (screenshot attached): having a
+separate labelled field above the team-box row was exactly the kind of disconnected-hierarchy layout the user
+had already objected to once — the name still didn't live where it visually applies. The ask was explicit:
+(1) delete that standalone box entirely, (2) make the team name directly editable *in the box's own title*,
+and (3) the "add 3rd team" affordance must sit in the same row as 建築師團隊/建國工程團隊 (side by side), not as
+a full-width button below them with explanatory paragraph text.
+**Decision**: `TeamBox` (`TeamPanel.tsx`) gained optional `titlePlaceholder`/`onTitleChange`/`onRemove` props —
+when `onTitleChange` is passed, the box's header itself renders as an inline text input (dashed underline,
+turns solid accent-colored on focus) instead of a static label; `onRemove` renders a small × icon inline in
+the header instead of a separate "移除此團隊" text link. Removed the standalone architect-name box completely.
+Added a new `AddTeamBox` ghost-button component, sized and styled to match `TeamBox` (`flex-1 min-w-[260px]`),
+so it renders as the 3rd flex item in the same row when there's no 3rd team yet — clicking it calls the same
+`addExtraTeam` as before, which swaps it for a real (now inline-titled, removable) `TeamBox`. 建國工程團隊 keeps
+its plain fixed-text header (no `onTitleChange`) since it's still always the firm's own fixed team, unaffected
+by this change. A single short caption line replaced the old paragraph-length hint.
+**Verification**: `npx tsc --noEmit` / `npx eslint` clean project-wide. Re-verified live in the running dev
+server: all 3 boxes (architect / 建國工程團隊 / add-3rd-team ghost box) render side by side in one row; typing
+directly into the architect and 3rd-team box headers persists and shows correctly in the read-mode org chart;
+removing the 3rd team via its inline × correctly collapses it back to the ghost "+ 新增第三個團隊" box. Test
+data reverted afterward, same as the #35 walkthrough.
+
+## 37. 招標文件自動判讀's "success" alert fired even when zero fields were extracted
+
+**Context**: User reported the feature still "doesn't work" after deploying, with a screenshot showing the
+"已自動帶入判讀結果" success dialog. Reading `InfoPanel.tsx`'s `handleExtract` found a real bug unrelated to
+OCR/parsing accuracy: the success alert was gated only on `res.ok` (the HTTP response), not on whether
+`parseTenderFields` actually matched anything — if OCR ran fine but extracted zero recognizable fields (a
+scanned/freeform document, a label OCR misread, etc., all documented as accuracy limits in `CLAUDE.md`), the
+UI would still cheerfully claim success with every field silently unchanged. This makes a real parsing failure
+indistinguishable from a real success, which is worse than an explicit error — the user has no signal to know
+whether to trust the (empty) result or manually fill in the form.
+**Decision**: Count how many fields actually got assigned inside the same `updateCase` callback (`filledCount`),
+and branch the alert on it: `0` → "文件已讀取，但沒有辨識出任何欄位，請手動填寫" (explicitly not a success);
+`>0` → "已自動帶入 N 個欄位的判讀結果" (states exactly how many, so a partial extraction isn't mistaken for
+a complete one either).
+**Consequence**: This doesn't fix any underlying OCR/timeout/platform issue on Vercel (still unverified without
+access to the user's deployment logs) — it fixes the UI lying about the outcome. If the user still sees "0
+個欄位" after this ships, that's a real, honestly-reported extraction failure worth investigating further
+(e.g. via Vercel's function logs), not a UI illusion of success.

@@ -5,6 +5,89 @@
 
 ---
 
+## 2026-07-29 — Fixed 招標文件自動判讀's false-success alert
+
+- [x] Found and fixed a real bug: the "已自動帶入判讀結果" success dialog fired on any 200 response, even
+      when zero fields were actually extracted — indistinguishable from a real success. Now counts filled
+      fields and shows an honest "沒有辨識出任何欄位，請手動填寫" message when the count is 0, or "已自動帶入
+      N 個欄位" otherwise. See `DECISIONS.md` #37. Doesn't rule out an underlying Vercel-specific issue (still
+      unverified) but removes a real, confirmed source of "looks like it worked but didn't" confusion.
+
+## 2026-07-29 — 3rd team is name-only (no member-name list)
+
+- [x] Removed the member-name list and "新增成員" button from the 3rd team box entirely — it's now just
+      the editable team-name title, the remove (×) control, and the 專業顧問 drag-drop zone. New `hideMemberList`
+      prop on `TeamBox`; `addExtraTeam` no longer seeds a blank member row, so a local `extraTeamJustAdded`
+      state keeps the box visible immediately after clicking "+" (before a name is typed) without relying on a
+      placeholder array entry.
+- [x] Verified live: adding a 3rd team shows only title+remove+drop-zone, typing a name persists and shows
+      correctly on the read-mode org chart with "尚無成員" for the empty member list, removing it correctly
+      collapses back to the ghost "+ 新增第三個團隊" box.
+
+## 2026-07-29 — Removed 新增建築師/新增機電團隊 add-member buttons
+
+- [x] Removed the "新增建築師" and "新增機電團隊" buttons from `TeamPanel.tsx`'s edit boxes (new `hideAddButton`
+      prop on `TeamBox`, set for the architect/jianguo instances only — the 3rd team's "新增成員" button is
+      unaffected). Existing member names can still be edited/deleted; members are otherwise added by dragging
+      a 專業顧問 into the box.
+
+## 2026-07-29 — Team-name editing moved inline into each org-chart box header
+
+- [x] Deleted the standalone "建築師團隊名稱" box added earlier the same day — direct feedback that it was
+      still the same disconnected-hierarchy problem, just moved. See `DECISIONS.md` #36.
+- [x] Architect and (optional) 3rd-team box headers in `TeamPanel.tsx` are now directly editable inline (click
+      the title, type the name) instead of a separate field elsewhere; 建國工程團隊's header stays fixed text
+      since it's always the firm's own in-house team.
+- [x] "+ 新增第三個團隊" is now a same-sized ghost box sitting in the same row as the other two team boxes
+      (side by side), not a full-width button below them.
+- [x] Re-verified live in the dev server: inline title editing persists and shows on the read-mode org chart;
+      3rd-team add/remove correctly toggles between the ghost box and a real box in place.
+
+## 2026-07-29 — Light login screen, dedicated architect team name, optional 3rd org-chart branch
+
+- [x] `LoginScreen.tsx` switched from its fixed dark brand palette to a light equivalent (same hex values as
+      the app's own light-theme `--color-*` variables) — reverses the earlier "don't touch it" decision now
+      that the user explicitly asked for it. See `DECISIONS.md` #35.
+- [x] Fixed the org-chart hierarchy complaint about the previous "first name becomes the title" hack: added a
+      dedicated `architectName` field (new `cases.architect_team_name` column) with its own standalone input
+      in `TeamPanel.tsx`, positioned above the member-list box instead of nested inside it.
+- [x] 備標團隊組織圖 now supports an optional 3rd branch (e.g. a JV MEP company), up to 3 total — opt-in via a
+      "+ 新增第三個團隊" button in `TeamPanel.tsx`, with its own name/members/consultant-assignment, and a
+      "移除此團隊" action. Extended `TeamGroup`/`team_group`/`simple_team_kind` (Postgres enum migration
+      `0010_bumpy_rumiko_fujikawa.sql`) and generalized `buildPptx.ts`'s `addOrgChart` to render 2 or 3
+      branches. Default (no 3rd team) case is visually unchanged.
+- [x] Verified end-to-end: real migration run against local Postgres + reseed, direct-script PPTX regenerated
+      for both 2-branch and 3-branch cases, and a live walkthrough of the actual `TeamPanel` UI in the running
+      dev server (login screen, architect-name field placement, add/remove 3rd team, org chart 2→3→2).
+
+## 2026-07-29 — PPT slide 1 redesign, org chart split into own slide, calendar font+column
+
+- [x] Rebuilt the exported PPT's slide 1 as a bilingual (Chinese/English) 案件基本資料 info table matching a
+      reference deck image the user supplied — "01 案件介紹" header, orange tab, olive label cells, alternating
+      rows, full-width 工程名稱/特殊說明 rows. See `DECISIONS.md` #31.
+- [x] Moved the 備標團隊 org chart out of slide 1 into its own dedicated slide 2; progress+milestones is now
+      slide 3; calendar months shift to slide 4+. `buildProjectPptx`'s `TOTAL` updated accordingly.
+- [x] Increased the PPT calendar grid's font sizes by 15% (weekday header, date numbers, task bullets/labels)
+      — chrome/title and the 逾期事項 sidebar left at their original sizes. See `DECISIONS.md` #32.
+- [x] Added the missing "本週目標/備註" 8th column to the PPT calendar table, sourced from the same
+      `c.weekNotes[weekKey]` data the web app's `CalendarView` uses.
+- [x] Verified all of the above via the established direct-script + unzip/grep method (no HTTP/auth, no UI
+      download) — confirmed slide text/colors/font sizes and correct slide renumbering.
+- [x] Reverted the earlier OS-preference-guessing theme experiment (`layout.tsx` init script, `ClientApp.tsx`
+      effect) back to always-light-by-default, dark opt-in-only via the in-app toggle, per the user's explicit
+      final decision. Login screen (`LoginScreen.tsx`) confirmed and left untouched — it's a fixed dark brand
+      design independent of the app's theme system. See `DECISIONS.md` #30.
+- [x] Removed `MainView.tsx`'s `max-w-[1240px]` cap entirely (superseding the earlier `mx-auto` centering fix)
+      so the main content area grows fluidly with screen width, per explicit request. See `DECISIONS.md` #29.
+- [x] Added `maxDuration = 60` to the `extract-tender` API route — the user confirmed the upload failure is
+      specifically on the deployed Vercel URL (not local), and OCR cold-starts can plausibly exceed the
+      platform's default serverless timeout. See `DECISIONS.md` #33.
+- [x] Fixed the 備標團隊組織圖: the architect branch's box is now titled with the actual partner firm/architect
+      name typed in (first entry), at the same hierarchy level as 建國工程團隊, instead of a fixed generic
+      label with names nested underneath. Also fixed a real pre-existing bug where the PPT export put
+      `team.mep` staff under the architect branch instead of jianguo. Applied to both `TeamPanel.tsx` and
+      `buildPptx.ts` so the web app and exported deck match. See `DECISIONS.md` #34.
+
 ## 2026-07-29 — RFI direction fix, onboarding reminder, recurring-meeting regen bug, PPT calendar redesign
 
 - [x] Verified the 招標文件自動判讀 upload feature actually works end-to-end (real browser file-input +

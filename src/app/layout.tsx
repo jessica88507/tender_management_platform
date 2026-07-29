@@ -39,17 +39,19 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full bg-background font-sans text-ink antialiased">
-        {/* Runs before hydration/paint so the login screen always starts light — deliberately
-            ignores both the OS preference and any previously-saved dark preference at this
-            stage, since whether anyone is signed in (and whose preference would even apply)
-            isn't known until the session check resolves. ClientApp.tsx re-applies the signed-in
-            user's own saved preference in an effect once that session is confirmed; on sign-out
-            it flips back to light for whoever's turn is next on this device. `beforeInteractive`
-            is Next.js's own mechanism for running this before hydration. The script sets
-            data-theme on <html> before React hydrates, which the server obviously couldn't have
-            rendered — suppressHydrationWarning above is the standard, deliberate opt-out for
-            exactly this one attribute (not a blanket suppression of real mismatches, since it
-            only affects the <html> element itself). */}
+        {/* Runs before hydration/paint so the app always starts light — deliberately ignores both
+            the OS preference and any previously-saved dark preference at this stage, since whether
+            anyone is signed in (and whose preference would even apply) isn't known until the
+            session check resolves. Per the user's explicit choice: light is the default for
+            everyone (including after signing in) unless a signed-in user has personally opted into
+            dark via the in-app toggle — dark mode is never guessed from the OS/browser setting.
+            ClientApp.tsx re-applies the signed-in user's own saved preference in an effect once
+            that session is confirmed; on sign-out it flips back to light for whoever's turn is next
+            on this device. `beforeInteractive` is Next.js's own mechanism for running this before
+            hydration. The script sets data-theme on <html> before React hydrates, which the server
+            obviously couldn't have rendered — suppressHydrationWarning above is the standard,
+            deliberate opt-out for exactly this one attribute (not a blanket suppression of real
+            mismatches, since it only affects the <html> element itself). */}
         <Script id="theme-init" strategy="beforeInteractive">
           {"document.documentElement.setAttribute('data-theme','light');"}
         </Script>

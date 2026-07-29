@@ -5,8 +5,11 @@ import { DEFAULT_TASK_TEMPLATES, TaskTemplateRow, mergeTemplates } from "./taskT
 
 export function normalizeTeam(team: Partial<Team> | undefined): Team {
   const t: Team = {
+    architectName: team?.architectName ?? "",
     architect: team?.architect ?? [],
     mep: team?.mep ?? [],
+    extraName: team?.extraName ?? "",
+    extraMembers: team?.extraMembers ?? [],
     consultants: (team?.consultants ?? []).map((item) =>
       typeof item === "string"
         ? { id: uid(), role: item, company: "", contact: "", affiliation: "", custom: true, team: null }
@@ -44,6 +47,7 @@ export function getOwnerOptions(c: Case): string[] {
   if (c.bidLead) opts.push(c.bidLead);
   (c.team.architect || []).forEach((n) => n && opts.push(n));
   (c.team.mep || []).forEach((n) => n && opts.push(n));
+  (c.team.extraMembers || []).forEach((n) => n && opts.push(n));
   (c.team.consultants || []).forEach((row) => row.contact && opts.push(row.contact));
   ["業主", "估算部", "模型資訊部", "建築師", "機電團隊", "備標團隊"].forEach((x) => opts.push(x));
   return Array.from(new Set(opts));

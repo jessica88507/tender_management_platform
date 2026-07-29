@@ -103,8 +103,11 @@ async function main() {
       "2026-08-02": "確認顧問團隊委託書用印進度",
     },
     team: {
+      architectName: "大山聯合建築師事務所",
       architect: ["林建成", "許雅婷"],
       mep: ["王政豪"],
+      extraName: "",
+      extraMembers: [],
       consultants: CONSULTANT_DEFAULTS.map((role, i) => ({
         id: `seed-consultant-${i}`,
         role,
@@ -147,6 +150,8 @@ async function main() {
       buildingType: caseData.buildingType,
       constructionPeriod: caseData.constructionPeriod,
       specialNotes: caseData.specialNotes,
+      architectTeamName: caseData.team.architectName,
+      extraTeamName: caseData.team.extraName,
     })
     .returning();
 
@@ -160,6 +165,12 @@ async function main() {
     ...caseData.team.mep.map((name, i) => ({
       caseId: createdCase.id,
       kind: "mep" as const,
+      name,
+      sortIndex: i,
+    })),
+    ...caseData.team.extraMembers.map((name, i) => ({
+      caseId: createdCase.id,
+      kind: "extra" as const,
       name,
       sortIndex: i,
     })),

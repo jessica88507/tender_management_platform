@@ -1,4 +1,4 @@
-export type TeamGroup = "architect" | "jianguo" | null;
+export type TeamGroup = "architect" | "jianguo" | "extra" | null;
 
 export type Consultant = {
   id: string;
@@ -11,8 +11,17 @@ export type Consultant = {
 };
 
 export type Team = {
+  // The architect branch's own org-chart title (e.g. the partner firm's name) — a dedicated field,
+  // not derived from `architect[0]`, so naming the team isn't tangled up with listing its members.
+  architectName: string;
   architect: string[];
   mep: string[];
+  // Optional 3rd org-chart branch (e.g. a JV MEP company handling this case's 機電) — empty
+  // `extraName` with no members means the branch simply doesn't render; unlike 建國工程團隊 (always
+  // the firm's own fixed in-house team), this one is per-case and user-named like the architect
+  // branch.
+  extraName: string;
+  extraMembers: string[];
   consultants: Consultant[];
 };
 

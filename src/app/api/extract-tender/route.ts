@@ -14,6 +14,13 @@ const MAX_FILES = 5;
 const MAX_FILE_BYTES = 15 * 1024 * 1024;
 const SUPPORTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
+// OCR (tesseract.js) alone can take 7-9+ seconds per scanned page, plus tesseract.js re-downloads
+// its chi_tra+eng language data on every cold start (cachePath is pinned to /tmp, which doesn't
+// persist between invocations on Vercel) — a multi-page scanned upload can easily exceed Vercel's
+// default serverless timeout (10s on Hobby) well before OCR even finishes. Raised explicitly so a
+// slow-but-working extraction doesn't get killed mid-request and surface as a generic failure.
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

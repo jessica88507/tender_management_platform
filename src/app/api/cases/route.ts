@@ -83,10 +83,11 @@ export async function POST(request: Request) {
       })
       .returning();
 
-    if (draft.team.architect.length || draft.team.mep.length) {
+    if (draft.team.architect.length || draft.team.mep.length || draft.team.extraMembers.length) {
       await tx.insert(teamMembers).values([
         ...draft.team.architect.map((name, i) => ({ caseId: created.id, kind: "architect" as const, name, sortIndex: i })),
         ...draft.team.mep.map((name, i) => ({ caseId: created.id, kind: "mep" as const, name, sortIndex: i })),
+        ...draft.team.extraMembers.map((name, i) => ({ caseId: created.id, kind: "extra" as const, name, sortIndex: i })),
       ]);
     }
     if (draft.team.consultants.length) {

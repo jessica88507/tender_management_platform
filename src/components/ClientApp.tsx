@@ -83,6 +83,9 @@ export default function ClientApp() {
     // The blocking init script (see layout.tsx) always starts the page on light, since it runs
     // before we know whether anyone's signed in. Once the session check resolves, apply the
     // signed-in user's own saved preference — or fall back to light on the login screen itself.
+    // Per the user's explicit choice, light is always the default (including for a user who's
+    // never touched the toggle) — dark is opt-in only via the in-app toggle, never guessed from
+    // the OS/browser's own dark-mode setting.
     try {
       const saved = session ? window.localStorage.getItem(THEME_KEY) : null;
       document.documentElement.setAttribute("data-theme", saved === "dark" ? "dark" : "light");

@@ -30,7 +30,7 @@ export function MainView({
 
   return (
     <main ref={mainRef} className="flex-1 overflow-y-auto">
-      <div className="max-w-[1240px] mx-auto py-5 px-4 pb-10 sm:py-8 sm:px-11 sm:pb-15">
+      <div className="py-5 px-4 pb-10 sm:py-8 sm:px-11 sm:pb-15">
         {showForm ? (
           <NewCaseForm showEmptyState={!explicitNew} />
         ) : (

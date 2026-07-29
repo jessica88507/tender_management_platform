@@ -1,18 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { Bank, CaretRight, Check, HardHat, PencilSimple, Plus, UsersThree, X } from "@phosphor-icons/react";
+import { Bank, Buildings, CaretRight, Check, HardHat, PencilSimple, Plus, UsersThree, X } from "@phosphor-icons/react";
 import { Case, Consultant, TeamGroup } from "@/lib/types";
 import { useApp } from "@/context/AppContext";
 import { uid } from "@/lib/date";
 
-const TEAM_LABELS: Record<Exclude<TeamGroup, null>, string> = {
+const TEAM_LABELS: Record<"architect" | "jianguo", string> = {
   architect: "建築師團隊",
   jianguo: "建國工程團隊",
 };
 const TEAM_ICONS: Record<Exclude<TeamGroup, null>, typeof Bank> = {
   architect: Bank,
   jianguo: HardHat,
+  extra: Buildings,
 };
 
 const btnMiniClass =
@@ -58,13 +59,30 @@ function TeamBox({
   group,
   simpleKey,
   simpleLabel,
+  title,
+  titlePlaceholder,
+  onTitleChange,
+  onRemove,
+  hideAddButton,
+  hideMemberList,
   c,
   caseId,
   onDropConsultant,
 }: {
   group: Exclude<TeamGroup, null>;
-  simpleKey: "architect" | "mep";
+  simpleKey: "architect" | "mep" | "extraMembers";
   simpleLabel: string;
+  title: string;
+  // When provided, the box's own header becomes the editable team-name field (architect/extra) —
+  // instead of a separate field elsewhere — so naming the team happens right where it appears on
+  // the org chart. Omitted for 建國工程團隊, which is always the firm's own fixed in-house team.
+  titlePlaceholder?: string;
+  onTitleChange?: (value: string) => void;
+  onRemove?: () => void;
+  hideAddButton?: boolean;
+  // 3rd team is name-only (no manual member-name list) — just the editable title + consultant
+  // drag-drop. Implies hideAddButton.
+  hideMemberList?: boolean;
   c: Case;
   caseId: string;
   onDropConsultant: (id: string, group: TeamGroup) => void;
@@ -111,29 +129,54 @@ function TeamBox({
       }}
     >
       <div className="font-serif font-bold text-[18px] mb-2 flex items-center gap-1.5">
-        <Icon weight="fill" size={16} className="text-accent" />
-        {TEAM_LABELS[group]}
+        <Icon weight="fill" size={16} className="text-accent shrink-0" />
+        {onTitleChange ? (
+          <input
+            type="text"
+            value={title}
+            placeholder={titlePlaceholder}
+            onChange={(e) => onTitleChange(e.target.value)}
+            className="flex-1 min-w-0 bg-transparent border-b-[1.5px] border-dashed border-border focus:border-accent focus:outline-none font-serif font-bold text-[18px] text-ink placeholder:text-ink-soft placeholder:font-normal placeholder:text-[14.5px] py-0.5"
+          />
+        ) : (
+          <span>{title}</span>
+        )}
+        {onRemove && (
+          <button
+            title="移除此團隊"
+            onClick={onRemove}
+            className="shrink-0 text-border hover:text-danger cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-danger"
+          >
+            <X size={16} />
+          </button>
+        )}
       </div>
-      <div className="flex flex-col gap-1.5 mb-2.5">
-        {names.map((name, idx) => (
-          <div className="flex items-center gap-2" key={idx}>
-            <input
-              type="text"
-              placeholder="姓名"
-              value={name}
-              onChange={(e) => setName(idx, e.target.value)}
-              className="flex-1 py-1.5 px-2 border border-border rounded-md text-[16px] bg-card"
-            />
-            <button title="刪除" onClick={() => removeName(idx)} className="text-border hover:text-danger cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-danger">
-              <X size={15} />
-            </button>
+      {!hideMemberList && (
+        <>
+          <div className="flex flex-col gap-1.5 mb-2.5">
+            {names.map((name, idx) => (
+              <div className="flex items-center gap-2" key={idx}>
+                <input
+                  type="text"
+                  placeholder="姓名"
+                  value={name}
+                  onChange={(e) => setName(idx, e.target.value)}
+                  className="flex-1 py-1.5 px-2 border border-border rounded-md text-[16px] bg-card"
+                />
+                <button title="刪除" onClick={() => removeName(idx)} className="text-border hover:text-danger cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-danger">
+                  <X size={15} />
+                </button>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      <button className={btnMiniClass} onClick={addName}>
-        <Plus weight="bold" size={13} />
-        新增{simpleLabel}
-      </button>
+          {!hideAddButton && (
+            <button className={btnMiniClass} onClick={addName}>
+              <Plus weight="bold" size={13} />
+              新增{simpleLabel}
+            </button>
+          )}
+        </>
+      )}
 
       <div className="flex flex-wrap gap-1.5 min-h-[34px] border-t border-dashed border-border pt-2 mt-2.5">
         {assigned.map((row) => (
@@ -159,9 +202,33 @@ function TeamBox({
   );
 }
 
+// Sits inline alongside the architect/jianguo boxes (same size/row) rather than as a separate
+// element below them — the org chart's 2nd tier supports up to 3 branches, so the "add a 3rd one"
+// affordance should look like the empty slot it is, not a disconnected button.
+function AddTeamBox({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex-1 min-w-[260px] rounded-[10px] border-[1.5px] border-dashed border-accent/50 p-3 bg-accent/5 hover:bg-accent/10 transition-colors flex flex-col items-center justify-center gap-1.5 text-center cursor-pointer min-h-[120px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+    >
+      <span className="inline-flex items-center gap-1.5 text-accent font-bold text-[16px]">
+        <Plus weight="bold" size={15} />
+        新增第三個團隊
+      </span>
+      <span className="text-[13.5px] text-ink-soft px-2">
+        例如：JV機電公司。沒有的話不用理會這裡。
+      </span>
+    </button>
+  );
+}
+
 export function TeamPanel({ caseId, c }: { caseId: string; c: Case }) {
   const { ui, setTeamOpen, setTeamEditing, updateCase, canEditActive } = useApp();
   const [poolOver, setPoolOver] = useState(false);
+  // Keeps the 3rd-team box visible immediately after clicking "+ 新增第三個團隊", before any name
+  // has been typed — `extraName` alone (with no member-name list anymore) is what real saved data
+  // relies on, so an empty draft would otherwise collapse straight back into the ghost add-box.
+  const [extraTeamJustAdded, setExtraTeamJustAdded] = useState(false);
 
   const setConsultantField = (idx: number, field: "role" | "company" | "contact", value: string) => {
     updateCase(caseId, (draft) => {
@@ -192,9 +259,42 @@ export function TeamPanel({ caseId, c }: { caseId: string; c: Case }) {
       if (row) row.team = group;
     });
   };
+  const setArchitectName = (value: string) => {
+    updateCase(caseId, (draft) => {
+      draft.team.architectName = value;
+    });
+  };
+  const addExtraTeam = () => {
+    setExtraTeamJustAdded(true);
+  };
+  const removeExtraTeam = () => {
+    setExtraTeamJustAdded(false);
+    updateCase(caseId, (draft) => {
+      draft.team.extraName = "";
+      draft.team.extraMembers = [];
+      draft.team.consultants.forEach((x) => {
+        if (x.team === "extra") x.team = null;
+      });
+    });
+  };
+  const setExtraName = (value: string) => {
+    updateCase(caseId, (draft) => {
+      draft.team.extraName = value;
+    });
+  };
 
   const unassigned = c.team.consultants.filter((x) => !x.team);
+  const hasExtraTeamData = c.team.extraName.trim() !== "" || c.team.extraMembers.length > 0 || c.team.consultants.some((x) => x.team === "extra");
+  const showExtraBox = hasExtraTeamData || extraTeamJustAdded;
+  const architectConsultants = c.team.consultants.filter((x) => x.team === "architect");
+  const jianguoConsultants = c.team.consultants.filter((x) => x.team === "jianguo");
+  const extraConsultants = c.team.consultants.filter((x) => x.team === "extra");
   const tableInputClass = "w-full border border-transparent bg-transparent py-1 px-1.5 rounded text-[15.5px] focus:border-border focus:bg-card focus:outline-none";
+  const teamDisplayLabel = (group: TeamGroup) => {
+    if (group === "extra") return c.team.extraName || "第三團隊";
+    if (group === "architect" || group === "jianguo") return TEAM_LABELS[group];
+    return "未分類（請於上方拖曳分類）";
+  };
 
   return (
     <details
@@ -232,17 +332,25 @@ export function TeamPanel({ caseId, c }: { caseId: string; c: Case }) {
             </div>
             <div className="relative flex gap-7 flex-wrap justify-center w-full before:content-[''] before:absolute before:top-0 before:left-5 before:right-5 before:h-0 before:border-t-2 before:border-border">
               <OrgBranch
-                title={TEAM_LABELS.architect}
+                title={c.team.architectName || TEAM_LABELS.architect}
                 icon={TEAM_ICONS.architect}
                 names={c.team.architect.filter(Boolean)}
-                consultants={c.team.consultants.filter((x) => x.team === "architect")}
+                consultants={architectConsultants}
               />
               <OrgBranch
                 title={TEAM_LABELS.jianguo}
                 icon={TEAM_ICONS.jianguo}
                 names={c.team.mep.filter(Boolean)}
-                consultants={c.team.consultants.filter((x) => x.team === "jianguo")}
+                consultants={jianguoConsultants}
               />
+              {hasExtraTeamData && (
+                <OrgBranch
+                  title={c.team.extraName || "第三團隊"}
+                  icon={TEAM_ICONS.extra}
+                  names={c.team.extraMembers.filter(Boolean)}
+                  consultants={extraConsultants}
+                />
+              )}
               {unassigned.length > 0 && <OrgBranch title="未分類顧問" names={[]} consultants={unassigned} />}
             </div>
           </div>
@@ -250,11 +358,15 @@ export function TeamPanel({ caseId, c }: { caseId: string; c: Case }) {
 
         {ui.teamEditing && canEditActive && (
           <>
-            <div className="flex gap-4 mb-3.5 flex-wrap">
+            <div className="flex gap-4 mb-1.5 flex-wrap">
               <TeamBox
                 group="architect"
                 simpleKey="architect"
                 simpleLabel="建築師"
+                title={c.team.architectName}
+                titlePlaceholder="例如：OO建築師事務所"
+                onTitleChange={setArchitectName}
+                hideAddButton
                 c={c}
                 caseId={caseId}
                 onDropConsultant={assignConsultantTeam}
@@ -263,10 +375,32 @@ export function TeamPanel({ caseId, c }: { caseId: string; c: Case }) {
                 group="jianguo"
                 simpleKey="mep"
                 simpleLabel="機電團隊"
+                title={TEAM_LABELS.jianguo}
+                hideAddButton
                 c={c}
                 caseId={caseId}
                 onDropConsultant={assignConsultantTeam}
               />
+              {showExtraBox ? (
+                <TeamBox
+                  group="extra"
+                  simpleKey="extraMembers"
+                  simpleLabel="成員"
+                  title={c.team.extraName}
+                  titlePlaceholder="例如：OO機電工程股份有限公司（JV）"
+                  onTitleChange={setExtraName}
+                  onRemove={removeExtraTeam}
+                  hideMemberList
+                  c={c}
+                  caseId={caseId}
+                  onDropConsultant={assignConsultantTeam}
+                />
+              ) : (
+                <AddTeamBox onClick={addExtraTeam} />
+              )}
+            </div>
+            <div className="text-[13.5px] text-ink-soft mb-3.5">
+              團隊名稱可直接點選上方框框標題輸入，會同步顯示在組織圖上。
             </div>
 
             <div
@@ -352,9 +486,7 @@ export function TeamPanel({ caseId, c }: { caseId: string; c: Case }) {
                         />
                       </td>
                       <td className="border-b border-dashed border-border py-1 px-1.5">
-                        <span className="text-[13px] text-accent whitespace-nowrap">
-                          {row.team ? TEAM_LABELS[row.team] : "未分類（請於上方拖曳分類）"}
-                        </span>
+                        <span className="text-[13px] text-accent whitespace-nowrap">{teamDisplayLabel(row.team)}</span>
                       </td>
                       <td className="border-b border-dashed border-border py-1 px-1.5">
                         <button title="刪除" onClick={() => removeConsultant(idx)} className="text-border hover:text-danger cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-danger">

@@ -59,6 +59,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         buildingType: body.buildingType ?? "",
         constructionPeriod: body.constructionPeriod ?? "",
         specialNotes: body.specialNotes ?? "",
+        architectTeamName: body.team?.architectName ?? "",
+        extraTeamName: body.team?.extraName ?? "",
         categoryOrder: body.categoryOrder ?? null,
         updatedAt: new Date(),
       })
@@ -69,10 +71,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     await tx.delete(consultants).where(eq(consultants.caseId, id));
     await tx.delete(weekNotes).where(eq(weekNotes.caseId, id));
 
-    if (body.team?.architect?.length || body.team?.mep?.length) {
+    if (body.team?.architect?.length || body.team?.mep?.length || body.team?.extraMembers?.length) {
       await tx.insert(teamMembers).values([
         ...(body.team.architect ?? []).map((name, i) => ({ caseId: id, kind: "architect" as const, name, sortIndex: i })),
         ...(body.team.mep ?? []).map((name, i) => ({ caseId: id, kind: "mep" as const, name, sortIndex: i })),
+        ...(body.team.extraMembers ?? []).map((name, i) => ({ caseId: id, kind: "extra" as const, name, sortIndex: i })),
       ]);
     }
     if (body.team?.consultants?.length) {

@@ -64,25 +64,33 @@ export function InfoPanel({ caseId, c, totalDays }: { caseId: string; c: Case; t
         return;
       }
       const fields = data.fields ?? {};
+      let filledCount = 0;
       updateCase(caseId, (draft) => {
-        if (typeof fields.contractAmount === "number") draft.contractAmount = fields.contractAmount;
-        if (typeof fields.siteArea === "number") draft.siteArea = fields.siteArea;
-        if (typeof fields.floorArea === "number") draft.floorArea = fields.floorArea;
-        if (typeof fields.floorCount === "string" && fields.floorCount) draft.floorCount = fields.floorCount;
-        if (typeof fields.tenderStart === "string" && fields.tenderStart) draft.start = fields.tenderStart;
-        if (typeof fields.deadline === "string" && fields.deadline) draft.deadline = fields.deadline;
-        if (typeof fields.ownerOrg === "string" && fields.ownerOrg) draft.ownerOrg = fields.ownerOrg;
-        if (typeof fields.userUnit === "string" && fields.userUnit) draft.userUnit = fields.userUnit;
-        if (typeof fields.location === "string" && fields.location) draft.location = fields.location;
-        if (typeof fields.contractMode === "string" && fields.contractMode) draft.contractMode = fields.contractMode;
-        if (typeof fields.contractScope === "string" && fields.contractScope) draft.contractScope = fields.contractScope;
-        if (typeof fields.supervisorUnit === "string" && fields.supervisorUnit) draft.supervisorUnit = fields.supervisorUnit;
-        if (typeof fields.buildingType === "string" && fields.buildingType) draft.buildingType = fields.buildingType;
-        if (typeof fields.constructionPeriod === "string" && fields.constructionPeriod) draft.constructionPeriod = fields.constructionPeriod;
-        if (typeof fields.specialNotes === "string" && fields.specialNotes) draft.specialNotes = fields.specialNotes;
+        if (typeof fields.contractAmount === "number") { draft.contractAmount = fields.contractAmount; filledCount++; }
+        if (typeof fields.siteArea === "number") { draft.siteArea = fields.siteArea; filledCount++; }
+        if (typeof fields.floorArea === "number") { draft.floorArea = fields.floorArea; filledCount++; }
+        if (typeof fields.floorCount === "string" && fields.floorCount) { draft.floorCount = fields.floorCount; filledCount++; }
+        if (typeof fields.tenderStart === "string" && fields.tenderStart) { draft.start = fields.tenderStart; filledCount++; }
+        if (typeof fields.deadline === "string" && fields.deadline) { draft.deadline = fields.deadline; filledCount++; }
+        if (typeof fields.ownerOrg === "string" && fields.ownerOrg) { draft.ownerOrg = fields.ownerOrg; filledCount++; }
+        if (typeof fields.userUnit === "string" && fields.userUnit) { draft.userUnit = fields.userUnit; filledCount++; }
+        if (typeof fields.location === "string" && fields.location) { draft.location = fields.location; filledCount++; }
+        if (typeof fields.contractMode === "string" && fields.contractMode) { draft.contractMode = fields.contractMode; filledCount++; }
+        if (typeof fields.contractScope === "string" && fields.contractScope) { draft.contractScope = fields.contractScope; filledCount++; }
+        if (typeof fields.supervisorUnit === "string" && fields.supervisorUnit) { draft.supervisorUnit = fields.supervisorUnit; filledCount++; }
+        if (typeof fields.buildingType === "string" && fields.buildingType) { draft.buildingType = fields.buildingType; filledCount++; }
+        if (typeof fields.constructionPeriod === "string" && fields.constructionPeriod) { draft.constructionPeriod = fields.constructionPeriod; filledCount++; }
+        if (typeof fields.specialNotes === "string" && fields.specialNotes) { draft.specialNotes = fields.specialNotes; filledCount++; }
       });
       setTenderFiles([]);
-      await customAlert("已自動帶入判讀結果，請確認欄位內容正確無誤後再儲存。");
+      // Previously this alert fired unconditionally on any 200 response — even when `fields` came
+      // back empty (OCR ran but nothing matched a known label), which silently looked like success
+      // while filling in nothing. Report the actual count so a real failure is visible as one.
+      if (filledCount === 0) {
+        await customAlert("文件已讀取，但沒有辨識出任何欄位，請手動填寫。（此功能對非制式招標公告格式的文件辨識率較低）");
+      } else {
+        await customAlert(`已自動帶入 ${filledCount} 個欄位的判讀結果，請確認欄位內容正確無誤後再儲存。`);
+      }
     } catch (err) {
       console.error(err);
       await customAlert("判讀失敗，請稍後再試。");
