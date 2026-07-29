@@ -55,6 +55,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ fields, ocrPageCount });
   } catch (err) {
     console.error(err);
-    return NextResponse.json({ error: "文件判讀失敗，請稍後再試。" }, { status: 502 });
+    // Surfaces the actual thrown error (not just a generic message) directly in the alert the user
+    // already sees — without this, diagnosing a production-only failure requires pulling Vercel's
+    // function logs, which has been the actual bottleneck across several rounds of "still broken"
+    // reports with no further detail. Safe to expose here: this is an internal tool behind auth,
+    // not a public endpoint, and the error is about file-processing internals, not user data.
+    const message = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    return NextResponse.json({ error: `文件判讀失敗：${message}` }, { status: 502 });
   }
 }
