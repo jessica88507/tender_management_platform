@@ -61,6 +61,16 @@ export function subtractBusinessDays(date: Date, n: number): Date {
   return d;
 }
 
+export function addBusinessDays(date: Date, n: number): Date {
+  const d = new Date(date);
+  let remaining = n;
+  while (remaining > 0) {
+    d.setDate(d.getDate() + 1);
+    if (d.getDay() !== 0 && d.getDay() !== 6 && !isHoliday(d)) remaining--;
+  }
+  return d;
+}
+
 export function fmtWeekday(dateStr: string): string {
   const d = new Date(dateStr + "T00:00:00");
   const w = ["日", "一", "二", "三", "四", "五", "六"][d.getDay()];

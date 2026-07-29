@@ -5,6 +5,31 @@
 
 ---
 
+## 2026-07-29 — RFI direction fix, onboarding reminder, recurring-meeting regen bug, PPT calendar redesign
+
+- [x] Verified the 招標文件自動判讀 upload feature actually works end-to-end (real browser file-input +
+      fetch, using the same real 招標公告.pdf the user provided earlier) — got a 200 with correctly-extracted
+      fields, not the error the user reported. Most likely explanation: a stale dev-server process from before
+      the `@napi-rs/canvas`/`serverExternalPackages` fix landed, or the user was testing a deployed (not local)
+      URL — flagged this back to the user rather than assuming it's still broken with no reproduction.
+- [x] Fixed 提出釋疑 (RFI) to count 25% of the work period forward from 招標公告, not backward from 投標截止 —
+      these are different dates, not the same rule stated two ways. See `DECISIONS.md` #24.
+- [x] New-case `OnboardingTutorial` gained a 5th step reminding the user the generated schedule is a company-
+      standard default, not case-specific — the 主投標手 still needs to adjust it. See `DECISIONS.md` #25.
+- [x] Fixed a real bug: changing 例行會議固定星期 and clicking "依目前設定調整排程" didn't move the recurring
+      meetings to the new weekday, because they had no `key` and were always treated as untouchable manual
+      tasks by the regen merge. See `DECISIONS.md` #26.
+- [x] Rebuilt the exported PPT's calendar slides to color-code tasks by category (matching CalendarView's exact
+      colors) and star+highlight milestones, instead of a plain-text task list per day. See `DECISIONS.md` #27.
+- [x] Re-audited mobile (390px) responsiveness across all three admin panels (members/projects/task-templates)
+      — all fine, consistent with the existing "wide table scrolls horizontally" pattern. Flagged a likely
+      bigger real issue to the user: `CalendarView`'s drag-to-reschedule and `TeamPanel`'s drag-to-classify both
+      use HTML5 native drag-and-drop, which has no touch equivalent on real mobile browsers — if the user is
+      testing on an actual phone, this (not CSS layout) is probably the real "still not responsive" complaint.
+      Not fixed yet — flagged for the user to confirm before taking on what would be a real architecture change.
+- [x] Fixed a large blank area on the right side on wide monitors — `MainView`'s `max-w-[1240px]` content
+      wrapper had no `mx-auto`, so it sat flush-left instead of centered. See `DECISIONS.md` #28.
+
 ## 2026-07-28 — 案件資訊: 標案形式 field, 契約模式 dropdown, 每坪造價 (branch `feature/case-info-fields`)
 
 - [x] Added `tenderType` (標案形式: 統包工程／私人案) as a new `cases` column end-to-end (schema, migration

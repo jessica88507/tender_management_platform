@@ -434,7 +434,7 @@ export const DEFAULT_TASK_TEMPLATES: TaskTemplateRow[] = [
     owner: "備標團隊",
     enabled: true,
     kind: "special",
-    note: "投標截止前工期25%（工期以扣除例假日與國定假日的工作天計算），遇假日自動提前至最近工作日。",
+    note: "招標公告後工期25%（工期以扣除例假日與國定假日的工作天計算，從招標公告起算），遇假日自動提前至最近工作日。",
   },
   {
     key: "bid_opening",

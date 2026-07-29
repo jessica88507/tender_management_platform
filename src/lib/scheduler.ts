@@ -1,5 +1,5 @@
 import { Case, Task, Team } from "./types";
-import { addDays, businessDaysBetween, snapToBizDay, subtractBusinessDays, toISO, uid } from "./date";
+import { addBusinessDays, addDays, businessDaysBetween, snapToBizDay, subtractBusinessDays, toISO, uid } from "./date";
 import { CONSULTANT_DEFAULTS, WEEKDAY_NAMES } from "./constants";
 import { DEFAULT_TASK_TEMPLATES, TaskTemplateRow, mergeTemplates } from "./taskTemplates";
 
@@ -149,7 +149,13 @@ export function generateTasks(c: Case, templateOverrides?: TaskTemplateRow[] | n
         meetingTpl.category,
         `${meetingTpl.label}${String(i + 1).padStart(2, "0")}（${WEEKDAY_NAMES[weekday]}）`,
         meetingTpl.owner,
-        d
+        d,
+        null,
+        // Each instance needs its own stable key so InfoPanel's "依目前設定調整排程" regen (see
+        // handleRegen) can actually match and replace them — without this, changing 例行會議固定星期
+        // and regenerating just added a fresh set of meetings on the new weekday alongside the old
+        // ones forever (no key ⇒ treated as an untouchable manual/orphaned task, never replaced).
+        `meeting_recurring_${i + 1}`
       )
     );
   }
@@ -205,8 +211,8 @@ export function generateTasks(c: Case, templateOverrides?: TaskTemplateRow[] | n
   const submitBase = deadlineMinutes < 10 * 60 ? addDays(deadlineDate, -1) : deadlineDate;
   addT("submit_action", snapToBizDay(submitBase));
 
-  // 投標截止前工期25%（工期＝扣除例假日與國定假日的工作天數），再往前抓最近的工作日。
-  addT("rfi", snapToBizDay(subtractBusinessDays(deadlineDate, Math.round(totalDaysForRatio * 0.25))));
+  // 招標公告後工期25%（工期＝扣除例假日與國定假日的工作天數，從招標公告起算），再往後抓最近的工作日。
+  addT("rfi", snapToBizDay(addBusinessDays(start, Math.round(totalDaysForRatio * 0.25))));
 
   // ---- Generic "fixed" (anchor + offsetDays) and "ratio" (% of total duration before
   // deadline) rows — fully data-driven from the templates, no special-case logic needed. ----

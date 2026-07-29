@@ -1,7 +1,15 @@
 import PptxGenJS from "pptxgenjs";
 import type { Case } from "./types";
+import { CATEGORIES } from "./constants";
 import { caseDaysLeft, caseProgress } from "./derived";
-import { buildAllMonthsCalendars, buildMilestoneList, overdueTasks, type CalendarMonth, type MilestoneStatus } from "./reportData";
+import {
+  buildAllMonthsCalendars,
+  buildMilestoneList,
+  overdueTasks,
+  type CalendarDay,
+  type CalendarMonth,
+  type MilestoneStatus,
+} from "./reportData";
 
 // Server-side PPTX generation only (this module must never be imported from client components) —
 // running PptxGenJS in the browser previously crashed the tab (see docs/MEMORY.md item 4); running
@@ -20,6 +28,20 @@ const COLOR = {
   skyPale: "DCE6ED",
   paperLight: "F8F4EA",
   white: "FFFFFF",
+  highlight: "B45309",
+};
+
+// Same hex values as the web app's light-theme `--color-*` category variables (globals.css) — the
+// calendar slide (buildCalendarSlide) mirrors CalendarView's category-color coding exactly, rather
+// than reusing this file's own separate chrome palette above, so a task's color means the same
+// thing on-screen and in the exported deck.
+const CATEGORY_HEX: Record<string, string> = {
+  [CATEGORIES[0]]: "1E3A5F", // 會議安排 — navy
+  [CATEGORIES[1]]: "65A30D", // 公司內部流程 — olive
+  [CATEGORIES[2]]: "BE185D", // 服務建議書製作 — rose
+  [CATEGORIES[3]]: "059669", // 投標文件蒐集、確認 — done-green
+  [CATEGORIES[4]]: "D97706", // 評選作業 — amber
+  [CATEGORIES[5]]: "475569", // 其他事項 — steel
 };
 
 // Widely available on Windows (the target platform for this firm) with full CJK glyph coverage —
@@ -366,26 +388,45 @@ function buildCalendarSlide(
     options: { bold: true, fill: { color: COLOR.skyPale }, color: COLOR.inkSoft, fontSize: 10, align: "center" },
   }));
   const MAX_TASKS_PER_CELL = 3;
+  // Mirrors CalendarView's day cell exactly, not a text summary of it: each task gets a coloured
+  // dot in its actual category color (same hex as CATEGORY_HEX/CalendarView's --color-* vars), a
+  // ★ + bold + highlight color for milestones (matching the web's star-icon + highlight-soft
+  // treatment), and strikethrough for done tasks — so a task's category and status both stay
+  // visually readable at a glance, the exact complaint about the old plain-text version.
+  const dayCellRuns = (day: CalendarDay): PptxGenJS.TableCell[] => {
+    const dateColor = day.inMonth ? COLOR.inkSoft : COLOR.lineGrey;
+    const runs: PptxGenJS.TableCell[] = [{ text: `${day.date}`, options: { color: dateColor, bold: true, fontSize: 9, breakLine: true } }];
+    const visible = day.tasks.slice(0, MAX_TASKS_PER_CELL);
+    const hidden = day.tasks.length - visible.length;
+    visible.forEach((t) => {
+      if (t.milestone) {
+        runs.push({ text: "★ ", options: { color: t.done ? COLOR.lineGrey : COLOR.highlight, bold: true, fontSize: 8 } });
+        runs.push({
+          text: t.label,
+          options: { color: t.done ? COLOR.lineGrey : COLOR.ink, bold: true, fontSize: 8, breakLine: true },
+        });
+      } else {
+        runs.push({ text: "● ", options: { color: t.done ? COLOR.lineGrey : CATEGORY_HEX[t.cat] ?? COLOR.inkSoft, fontSize: 8 } });
+        runs.push({
+          text: t.label,
+          options: { color: t.done ? COLOR.lineGrey : COLOR.inkSoft, fontSize: 8, breakLine: true },
+        });
+      }
+    });
+    if (hidden > 0) {
+      runs.push({ text: `+${hidden} 項`, options: { color: COLOR.inkSoft, italic: true, fontSize: 8, breakLine: true } });
+    }
+    return runs;
+  };
   const calRows: PptxGenJS.TableRow[] = calMonth.weeks.map((week) =>
-    week.map((day) => {
-      const visible = day.tasks.slice(0, MAX_TASKS_PER_CELL);
-      const hidden = day.tasks.length - visible.length;
-      const lines = [
-        `${day.date}`,
-        ...visible.map((t) => `${t.milestone ? "★ " : ""}${t.label}`),
-        ...(hidden > 0 ? [`+${hidden} 項`] : []),
-      ];
-      return {
-        text: lines.join("\n"),
-        options: {
-          fontSize: 8.5,
-          color: day.inMonth ? COLOR.ink : COLOR.lineGrey,
-          fill: { color: day.isToday ? "DCEBE3" : COLOR.white },
-          align: "left" as const,
-          valign: "top" as const,
-        },
-      };
-    })
+    week.map((day) => ({
+      text: dayCellRuns(day),
+      options: {
+        fill: { color: day.isToday ? "DCEBE3" : COLOR.white },
+        align: "left" as const,
+        valign: "top" as const,
+      },
+    }))
   );
   slide.addTable([weekdayHeader, ...calRows], {
     x: MARGIN_X,

@@ -48,6 +48,11 @@ const STEPS: Step[] = [
     title: "第三步：管理時程",
     body: "切換「行事曆檢視」「任務清單」或「兩者檢視」來管理所有排程任務——勾選完成、標記大事記（★）、連結任務自動跟隨日期，或直接拖曳事件改期。",
   },
+  {
+    selector: '[data-tutorial="schedule-toggle"]',
+    title: "提醒：這是系統預設排程",
+    body: "上面產生的完整時程是依照公司內部標準流程自動排出來的預設值，僅供參考。實際仍需要主投標手依照本案的經驗與實際狀況調整時程，系統不會自動判斷個案差異。",
+  },
 ];
 
 type Rect = { top: number; left: number; width: number; height: number };

@@ -368,3 +368,80 @@ whether the source element survives to fire its own `dragend`.
 **Verification note**: consistent with `DECISIONS.md` #7 — the browser automation tool can't drive native
 HTML5 drag-and-drop directly, so this was verified by dispatching real `DragEvent`s (`dragstart`/`dragover`/
 `drop`/`dragend`) via JS and checking the moved card's computed `opacity` was back to `1` afterward.
+
+## 24. 提出釋疑 (RFI) now counts forward from 招標公告, not backward from 投標截止
+
+**Context**: `generateTasks`'s `rfi` rule computed its due date as `deadline - 25% of total business days`
+(i.e. anchored to, and counting backward from, 投標截止). The user pointed out 提出釋疑 (submitting requests
+for clarification) should instead be 25% of the total duration counting *forward* from 招標公告 (start) — a
+materially different date, not just the same rule expressed the other direction, since `deadline - 25%` and
+`start + 25%` only coincide if the 25%/75% split happens to land symmetrically (it doesn't, in general).
+**Decision**: Added `addBusinessDays` (`date.ts`) as the forward counterpart to the existing
+`subtractBusinessDays`, and changed the `rfi` rule to `snapToBizDay(addBusinessDays(start, round(totalDays *
+0.25)))`. `snapToBizDay` always moves a date *earlier* (see its own doc comment) regardless of which direction
+the anchor counts from, so this still lands on a business day, just via "pull back toward `start`" instead of
+"pull back toward `deadline`" — updated the template's note text and comment to describe "招標公告後" instead of
+"投標截止前".
+
+## 25. New-case onboarding tutorial gained a 5th step: the schedule is a default, not a final answer
+
+**Context**: User asked that, beyond the existing onboarding tour, new cases should carry an explicit reminder
+that the auto-generated schedule is the company's standard-process default, and the 主投標手 still needs to
+adjust it based on the specific case's experience and real-world circumstances.
+**Decision**: Added a 5th `OnboardingTutorial` step (after "第三步：管理時程", before "開始使用") reusing the
+same `[data-tutorial="schedule-toggle"]` spotlight target, rather than inventing a separate reminder mechanism
+(a second modal, a persistent banner, etc.) — the tour already runs once per new case and is the natural place
+a user reads this kind of caveat, and reusing it keeps the "one guided intro, then get out of the way" UX
+instead of stacking multiple different first-run interruptions.
+
+## 26. Changing 例行會議固定星期 and clicking regen now actually moves the recurring meetings
+
+**Context**: User found that changing 例行會議固定星期 (recurring meeting weekday) in `InfoPanel` and clicking
+"依目前設定調整排程" didn't move the already-generated recurring meeting tasks to the new weekday — the old
+ones stayed exactly where they were, and (if the admin regen path were more aggressive) would have simply
+accumulated a second set of meetings alongside the first rather than replacing them.
+**Root cause**: `generateTasks`'s recurring-meeting `add(...)` call never passed a `key` — every other task
+that participates in the regen merge (`InfoPanel.handleRegen`) is matched between the old and freshly-generated
+task lists *by key*; with no key, every recurring meeting instance was always treated as `orphaned` (kept
+as-is, untouched, forever) by that merge logic, the same category as a genuinely-custom manually-added task.
+**Decision**: Gave each recurring meeting instance a stable, index-based key (`meeting_recurring_${i+1}`) so
+regen's existing key-matching merge logic (already correct for every other task type — preserves manually-moved
+due dates, replaces unmoved ones with the fresh computation) now applies to recurring meetings too. Deliberately
+did *not* make the weekday change auto-apply without the regen button — every other `InfoPanel` field already
+requires that explicit step (see its own hint text: "調整上方欄位不會自動改動既有任務"), and special-casing just
+this one field would be inconsistent with that established, already-documented UX.
+**Consequence**: If the old and new weekday produce a different total meeting count, any extra old instances
+beyond the new count still show up as harmless orphaned leftovers (a pre-existing, narrower version of the same
+edge case every regen-merged task type has) — a real but minor edge case, not chased further here.
+**Verification**: confirmed via a direct `generateTasks` + regen-merge script test — weekday 2→4 correctly
+moved all instances from Tuesdays to Thursdays (`new Date(due).getDay() === 4`), not just added a second set.
+
+## 27. PPT calendar slide now mirrors CalendarView's actual visual coding, not a text summary
+
+**Context**: The exported PPT's calendar slides rendered each day's tasks as `★ label` / `label` plain-text
+lines in one paragraph per cell — no color, no way to tell a task's category at a glance, which the user
+called out as "很難判別行事曆上面的任務" (hard to tell tasks apart on the calendar) compared to the web app's
+CalendarView, where every task carries a category-colored left border, and milestones get a star + highlight
+styling.
+**Decision**: Rebuilt each day cell's task list as an array of `TableCell` rich-text runs (pptxgenjs supports
+`TableCell.text: string | TableCell[]`, each with its own `options` and `breakLine`) instead of one joined
+string: a colored "●" bullet per task in that category's exact color (`CATEGORY_HEX`, sharing the same hex
+values as `globals.css`'s light-theme `--color-*` category variables — not this file's own separate chrome
+palette, so a color means the same thing on-screen and in the deck), a "★" in `COLOR.highlight` for milestones,
+and both dimmed to `COLOR.lineGrey` for done tasks (no strikethrough — pptxgenjs's `TableCellProps` type doesn't
+expose `strike`, unlike its `addText` `TextPropsOptions`, so a dimmed color is the fidelity ceiling here).
+**Verification**: generated a real PPTX from a synthetic case exercising every category + a milestone + done
+tasks, unzipped it (a `.pptx` is a zip), and grepped the slide XML directly for the expected `srgbClr` hex
+values and "★"/"●" glyphs — confirmed all 6 category colors plus the highlight color appear as separate colored
+runs on the calendar slide, not one plain-colored text block.
+
+## 28. Main content column centered on wide screens (`mx-auto`)
+
+**Context**: User reported a large blank area on the right side when using the app on a bigger monitor.
+**Root cause**: `MainView.tsx`'s content wrapper has `max-w-[1240px]` (deliberately, so long lines of text/wide
+tables don't stretch uncomfortably far on large screens) but no `mx-auto` — so past 1240px+sidebar of viewport
+width, the capped block just sat flush-left inside its `flex-1 <main>`, dumping 100% of the leftover space on
+the right instead of splitting it evenly.
+**Decision**: Added `mx-auto` to that wrapper. Verified at a 1920px viewport: left and right gaps both measured
+exactly 225px (`main`'s available width 1690px − content's 1240px, split /2) — confirms it's now centered, not
+just "less obviously wrong."
