@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-07-30 — Fixed the real cause of the production upload failure: missing pdfjs worker file
+
+- [x] The error-surfacing fix immediately paid off: the actual production error was `Cannot find module
+      '.../pdfjs-dist/legacy/build/pdf.worker.mjs'` — a known class of issue where `pdfjs-dist`'s dynamic
+      worker import is invisible to Vercel's static file-tracing, so the worker file gets dropped from the
+      deployed function. Fixed via `outputFileTracingIncludes` in `next.config.ts`. See `DECISIONS.md` #38.
+- [x] Pushed to `main`; needs a real Vercel redeploy + retest to confirm — could not fully dry-run via a local
+      `npm run build` (fails locally on an unrelated, pre-existing `next/font/google`/Turbopack limitation
+      that only Vercel's own build containers resolve).
+
 ## 2026-07-29 — Surfaced the real error in extract-tender's failure alert
 
 - [x] User retested on the deployed Vercel site and got a genuine failure ("文件判讀失敗，請稍後再試"),

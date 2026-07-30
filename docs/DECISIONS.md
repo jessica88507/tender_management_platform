@@ -644,7 +644,30 @@ directly into the architect and 3rd-team box headers persists and shows correctl
 removing the 3rd team via its inline × correctly collapses it back to the ghost "+ 新增第三個團隊" box. Test
 data reverted afterward, same as the #35 walkthrough.
 
-## 37. 招標文件自動判讀's "success" alert fired even when zero fields were extracted
+## 38. pdfjs-dist worker file missing from the Vercel serverless bundle
+
+**Context**: The error-surfacing fix (#37's sibling change) paid off immediately — the user's next test
+returned the real underlying exception: `Error: Setting up fake worker failed: "Cannot find module
+'/var/task/node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs' imported from
+/var/task/node_modules/pdfjs-dist/legacy/build/pdf.mjs'."`. `pdfjs-dist`'s Node ("legacy") build has no
+real `Worker` available inside a serverless function, so it falls back to a "fake worker" by dynamically
+`import()`-ing its own `pdf.worker.mjs`, computed relative to its own module location at runtime. Vercel's
+build does static file-tracing to decide which `node_modules` files actually ship in a serverless function's
+deployed bundle — a dynamic import like this is invisible to that static analysis, so the worker file
+silently gets dropped even though the rest of `pdfjs-dist` is present (this is a known class of issue with
+`pdfjs-dist` specifically on serverless platforms, not specific to this app's setup).
+**Decision**: Added `outputFileTracingIncludes: { "/api/extract-tender": ["./node_modules/pdfjs-dist/legacy/
+build/pdf.worker.mjs"] }` to `next.config.ts` — Next.js's documented mechanism for exactly this "a dynamic
+import needs a file the tracer can't see" situation, scoped to just this one route rather than broadening
+`serverExternalPackages` or reaching for a workaround inside `extractText.ts` itself.
+**Verification limitation**: `npx tsc --noEmit` / `npx eslint` clean, and the dev server still starts fine
+with the new config key. Could **not** fully dry-run via `npm run build` locally — it fails on an unrelated,
+pre-existing issue (`next/font/google` under Turbopack tries to resolve `@vercel/turbopack-next`, a package
+that's only injected inside Vercel's own build containers, not available to a plain local `next build`).
+Confirmed this isn't a network problem (outbound HTTPS works fine in this environment) — it's a genuine gap
+in what a local build can exercise for this project, pre-dating this change. This fix targets the exact error
+string the user reported and uses Next's own documented API for it, but still needs a real Vercel redeploy +
+retest to confirm, same as every other production-only fix in this doc.
 
 **Context**: User reported the feature still "doesn't work" after deploying, with a screenshot showing the
 "已自動帶入判讀結果" success dialog. Reading `InfoPanel.tsx`'s `handleExtract` found a real bug unrelated to
