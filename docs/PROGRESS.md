@@ -5,6 +5,30 @@
 
 ---
 
+## 2026-08-03 — 系統助理 chat UX fixes: IME composition, quick-question chips, markdown bold
+
+- [x] Fixed a real bug: pressing Enter to confirm a Chinese IME composition was also triggering message
+      send — added `onCompositionStart`/`onCompositionEnd` + `isComposing` checks so Enter only sends once
+      the IME composition is actually confirmed.
+- [x] Added a persistent row of clickable common-question chips (這個案子還剩幾天？/有哪些任務還沒完成？/
+      主投標手是誰？/有哪些案子快到期？) above the input box, so users don't have to type to try it.
+- [x] The model's `**bold**` markdown was rendering as literal asterisks in the plain-text chat bubbles —
+      added a minimal bold-only renderer (not a full markdown parser) to fix that.
+
+## 2026-08-03 — Added 系統助理: a self-hosted-LLM Q&A chat, read-only by design
+
+- [x] New floating chat button (`AssistantChat.tsx`, stacked below the alert bell) opens a Copilot-style panel
+      for asking natural-language questions about the current case's data — grounded via a system prompt built
+      server-side from real Postgres data, not the client's own copy. Explicitly cannot perform any action
+      (create/edit/delete) — the system prompt states this and the model was verified to comply and redirect
+      to the UI when asked to "do" something instead of just answer.
+- [x] Backend calls the user's own self-hosted `qwen2.5:14b` (via Ollama), reached through a Cloudflare Tunnel
+      the user set up this session — no Anthropic/OpenAI API cost or dependency. New `LOCAL_LLM_URL`/
+      `LOCAL_LLM_SECRET` env vars (`.env` + `.env.example`); **still need to be added to Vercel's production
+      env vars** for this to work on the deployed site. See `DECISIONS.md` #41.
+- [x] Verified live end-to-end through the real tunnel: grounded answers match actual case data; a request to
+      modify data was correctly refused.
+
 ## 2026-08-03 — Fixed case-save data loss; case deletion restricted to admin
 
 - [x] Found and fixed two real bugs behind "my edits disappear / revert to old content": (1) a pending

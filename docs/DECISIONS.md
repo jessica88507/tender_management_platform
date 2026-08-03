@@ -733,3 +733,41 @@ the admin account: confirmed the floating button is gone from the member view; c
 now renders a working 刪除 button; confirmed via direct `fetch` calls that a member's `DELETE` call gets `403`
 ("只有系統管理員能刪除案件") while the admin's succeeds (tested against a nonexistent id to avoid touching
 real data — got the expected `404` past the role check, proving the check itself passes for admin).
+
+## 41. Self-hosted-LLM Q&A assistant (系統助理) — read-only by construction, no tool-calling
+
+**Context**: User wants a Copilot-style floating chat button for asking natural-language questions about their
+case/schedule data, explicitly **not** an agent that performs actions — "我現在目標沒有要這個模型幫我做事，我
+只需要有一個地方可以讓我去做詢問" (the goal isn't for the model to do things for me, I just need somewhere to
+ask questions). To avoid Anthropic API cost/dependency, the user set up their own local model this session:
+`qwen2.5:14b` via Ollama on their Mac, fronted by a small hand-rolled Node auth proxy (Ollama itself has no
+built-in auth) at `/Users/chenpinjie/Documents/code/local-llm-proxy`, exposed to the internet via a Cloudflare
+Tunnel (`cloudflared tunnel --url ...`, a free anonymous `trycloudflare.com` HTTPS endpoint) since Vercel's
+serverless functions run in Vercel's cloud, not on the user's LAN.
+**Decision**:
+- New `POST /api/assistant/chat` (`src/app/api/assistant/chat/route.ts`): takes the conversation history +
+  `activeCaseId`, builds a system prompt from that case's real data (`src/lib/assistantContext.ts`'s
+  `buildCaseContext`/`buildAllCasesSummary` — compact plain-text summaries, not raw JSON, both for token cost
+  and because a 14B model follows prose-shaped context more reliably than deeply nested JSON) fetched
+  server-side from Postgres (never trusting a client-supplied case blob), then forwards to the local model's
+  Ollama-compatible `/api/chat` endpoint via `LOCAL_LLM_URL`/`LOCAL_LLM_SECRET` env vars.
+- The system prompt explicitly and repeatedly states the assistant cannot perform any action (create/edit/
+  delete anything) and must say so + point the user back to the UI if asked to "do" something — this is the
+  *only* thing enforcing the "Q&A only" scope, so it has to stay explicit if the prompt is ever changed, not
+  left implicit or assumed from the absence of tools.
+- `src/components/AssistantChat.tsx`: floating button positioned directly below `AlertBanner`'s bell
+  (`top-36` vs. the bell's `top-20`, same `right-4.5`) so they stack without overlapping regardless of whether
+  a case is active — this button is mounted at the `AppShell` level (always present), while the bell only
+  renders inside `CaseView`. Chat history lives in local component state only (no persistence across reloads),
+  non-streaming (a single "思考中…" wait state) for simplicity — proportionate to actual usage of an internal
+  Q&A tool for a small team, not something that needs streaming UX polish.
+- `maxDuration = 60` on the route (same reasoning as the tender-extraction route: a self-hosted model over a
+  home/office connection is much slower and less predictable than a hosted API).
+- Added `LOCAL_LLM_URL`/`LOCAL_LLM_SECRET` to `.env` (real values, gitignored) and `.env.example` (placeholders
+  + explanation). **Still needs the same two added to Vercel's project env vars for production** — not
+  something that can be done from this environment.
+**Verification**: `npx tsc --noEmit` / `npx eslint` clean. Live end-to-end test against the real local model
+through the actual Cloudflare Tunnel: asked "這個案子還剩幾天？主投標手是誰？" while viewing a real case and
+got a correctly-grounded answer matching the case's actual displayed data (not a hallucination). Separately
+asked it to change the case's contract amount — confirmed it refused and pointed back to the UI, exactly per
+the read-only scoping in the system prompt, rather than claiming to have done it.

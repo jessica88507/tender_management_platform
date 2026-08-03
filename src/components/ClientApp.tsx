@@ -10,6 +10,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { MainView } from "@/components/MainView";
 import { LoginScreen } from "@/components/LoginScreen";
 import { AdminShell } from "@/components/AdminShell";
+import { AssistantChat } from "@/components/AssistantChat";
 
 function AppShell({
   userName,
@@ -59,6 +60,7 @@ function AppShell({
       >
         <ArrowUp weight="bold" size={18} />
       </button>
+      <AssistantChat />
     </div>
   );
 }
