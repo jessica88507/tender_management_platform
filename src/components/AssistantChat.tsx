@@ -4,7 +4,38 @@ import { useEffect, useRef, useState } from "react";
 import { ChatCircleDots, PaperPlaneTilt, X } from "@phosphor-icons/react";
 import { useApp } from "@/context/AppContext";
 
-type ChatMessage = { role: "user" | "assistant"; content: string };
+type Timing = {
+  dbSec: number;
+  totalSec: number | null;
+  loadSec: number | null;
+  promptEvalSec: number | null;
+  evalSec: number | null;
+};
+type ChatMessage = { role: "user" | "assistant"; content: string; timing?: Timing };
+
+// Shows where a slow reply's time actually went — the model reloading from idle (loadSec) is
+// usually the single biggest, most avoidable chunk when it shows up at all, versus prompt
+// processing (reading the case data) or generation (writing the answer), both of which scale with
+// how much data/text is involved rather than being a one-off cost.
+function formatTiming(t: Timing): string {
+  if (t.totalSec == null) return "";
+  const parts = [`共 ${t.totalSec}s`];
+  if (t.dbSec > 0.2) parts.push(`讀取案件 ${t.dbSec}s`);
+  if (t.loadSec && t.loadSec > 0.5) parts.push(`模型載入 ${t.loadSec}s`);
+  if (t.promptEvalSec) parts.push(`理解問題 ${t.promptEvalSec}s`);
+  if (t.evalSec) parts.push(`生成回答 ${t.evalSec}s`);
+  return parts.join("、");
+}
+
+function TypingDots() {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className="w-1.5 h-1.5 rounded-full bg-ink-soft animate-bounce [animation-delay:-0.3s]" />
+      <span className="w-1.5 h-1.5 rounded-full bg-ink-soft animate-bounce [animation-delay:-0.15s]" />
+      <span className="w-1.5 h-1.5 rounded-full bg-ink-soft animate-bounce" />
+    </span>
+  );
+}
 
 const SUGGESTED_QUESTIONS = ["這個案子還剩幾天？", "有哪些任務還沒完成？", "主投標手是誰？", "有哪些案子快到期？"];
 
@@ -50,7 +81,7 @@ export function AssistantChat() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "詢問失敗，請稍後再試。");
-      setMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
+      setMessages((prev) => [...prev, { role: "assistant", content: data.reply, timing: data.timing }]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "詢問失敗，請稍後再試。");
     } finally {
@@ -91,18 +122,22 @@ export function AssistantChat() {
                 <div className="text-[14.5px] text-ink-soft text-center mt-6">點下面的常見問題，或直接輸入你的問題。</div>
               )}
               {messages.map((m, i) => (
-                <div
-                  key={i}
-                  className={
-                    "max-w-[85%] rounded-lg py-2 px-3 text-[15px] leading-relaxed whitespace-pre-wrap " +
-                    (m.role === "user" ? "self-end bg-accent text-white" : "self-start bg-background text-ink")
-                  }
-                >
-                  {renderWithBold(m.content)}
+                <div key={i} className={"max-w-[85%] flex flex-col " + (m.role === "user" ? "self-end items-end" : "self-start items-start")}>
+                  <div
+                    className={
+                      "rounded-lg py-2 px-3 text-[15px] leading-relaxed whitespace-pre-wrap " +
+                      (m.role === "user" ? "bg-accent text-white" : "bg-background text-ink")
+                    }
+                  >
+                    {renderWithBold(m.content)}
+                  </div>
+                  {m.timing && <div className="text-[11.5px] text-ink-soft mt-0.5 px-1">{formatTiming(m.timing)}</div>}
                 </div>
               ))}
               {sending && (
-                <div className="self-start bg-background text-ink-soft rounded-lg py-2 px-3 text-[15px]">思考中…</div>
+                <div className="self-start bg-background text-ink-soft rounded-lg py-2 px-3 text-[15px] flex items-center gap-2">
+                  思考中 <TypingDots />
+                </div>
               )}
               {error && <div className="self-start bg-danger-soft text-danger rounded-lg py-2 px-3 text-[14px]">{error}</div>}
             </div>

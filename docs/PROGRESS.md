@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-08-04 — 系統助理 latency breakdown surfaced; animated "思考中" indicator
+
+- [x] User asked why responses take ~15s — model weakness, or the local/tunnel setup? Added real timing
+      data instead of guessing: `/api/assistant/chat` now returns Ollama's own duration breakdown (DB fetch,
+      model load, prompt eval, generation) alongside the reply, shown as a small caption under each assistant
+      message. First real measurement: 14.8s total, 13.7s of it in prompt eval (reading the case's full task
+      list), only 0.67s generating the actual answer — confirms the bottleneck is context size + local
+      hardware, not model quality or the tunnel/network.
+- [x] Replaced the static "思考中…" text with an animated three-dot typing indicator so a slow (but working)
+      response doesn't read as the UI having frozen.
+
 ## 2026-08-04 — Assistant day-count mismatch was a real server/client timezone bug, not a prompt issue
 
 - [x] The prompt-level fix (telling the model today's date) didn't actually fix it — user retested and got the

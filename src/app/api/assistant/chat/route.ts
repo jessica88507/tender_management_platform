@@ -35,9 +35,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "沒有收到任何訊息" }, { status: 400 });
   }
 
+  const dbStart = Date.now();
   const rows = await db.query.cases.findMany({
     with: { tasks: true, teamMembers: true, consultants: true, weekNotes: true },
   });
+  const dbSec = (Date.now() - dbStart) / 1000;
   const state: AppState = { cases: {}, lastActiveId: null };
   rows.forEach((row) => {
     state.cases[row.id] = rowToCase(row);
@@ -86,10 +88,35 @@ export async function POST(request: Request) {
       const text = await upstream.text().catch(() => "");
       throw new Error(`本機模型回應失敗（${upstream.status}）：${text.slice(0, 300)}`);
     }
-    const data = (await upstream.json()) as { message?: { content?: string } };
+    const data = (await upstream.json()) as {
+      message?: { content?: string };
+      total_duration?: number;
+      load_duration?: number;
+      prompt_eval_count?: number;
+      prompt_eval_duration?: number;
+      eval_count?: number;
+      eval_duration?: number;
+    };
     const reply = data.message?.content?.trim();
     if (!reply) throw new Error("本機模型沒有回傳任何內容");
-    return NextResponse.json({ reply });
+
+    // Ollama reports its own internal breakdown in nanoseconds — converted to seconds here so it's
+    // directly readable. `loadSec` is the tell for "the model had been idle and had to reload into
+    // memory" (Ollama unloads an idle model after a few minutes) vs. a already-warm model, which is
+    // usually the single biggest, most avoidable chunk of a slow response when it's non-trivial.
+    const ns = (n: number | undefined) => (typeof n === "number" ? Math.round(n / 1e6) / 1000 : null);
+    const timing = {
+      dbSec: Math.round(dbSec * 1000) / 1000,
+      totalSec: ns(data.total_duration),
+      loadSec: ns(data.load_duration),
+      promptEvalSec: ns(data.prompt_eval_duration),
+      evalSec: ns(data.eval_duration),
+      promptTokens: data.prompt_eval_count ?? null,
+      evalTokens: data.eval_count ?? null,
+    };
+    console.log("[assistant/chat] timing:", timing);
+
+    return NextResponse.json({ reply, timing });
   } catch (err) {
     console.error(err);
     const message = err instanceof Error ? err.message : String(err);
