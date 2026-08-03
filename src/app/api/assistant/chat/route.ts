@@ -54,9 +54,17 @@ export async function POST(request: Request) {
       ].join("\n")
     : ["使用者目前沒有開啟任何特定案件。系統中所有案件如下：", buildAllCasesSummary(state)].join("\n");
 
+  // Without an explicit "today" anchor, the model sometimes tries to re-derive day counts itself
+  // from the raw deadline string instead of trusting the number already computed below (with the
+  // same caseDaysLeft() the UI itself uses) — and gets it wrong, since it has no reliable notion of
+  // "today" on its own. Telling it the real date and explicitly forbidding recomputation fixes the
+  // mismatch reported between the UI's day count and the assistant's answer.
+  const todayIso = new Date().toISOString().slice(0, 10);
   const systemPrompt = [
     "你是「業務投標管理平台 Bigmaster」系統內建的問答助理，協助業務部同仁查詢招標／投標案件的排程與資料。",
+    `今天的日期是 ${todayIso}。`,
     "你只能根據下面提供的案件資料回答問題，不知道的事情要直接說不知道，不可以編造。",
+    "非常重要：下面案件資料裡「距離投標截止還有 N 天」「剩餘 N 天」這類天數都已經算好了，回答時直接引用這個數字即可，絕對不要自己用日期重新計算天數——你自己算很容易算錯。",
     "非常重要：你沒有能力、也絕對不可以宣稱自己新增、修改、刪除了任何案件、任務或欄位——你只能回答問題，所有實際操作都必須由使用者自己在畫面上完成。如果使用者要求你「幫他做」什麼事，要清楚說明你只能提供資訊，無法代為操作，並告訴他應該去畫面上哪裡自己動手。",
     "回答請使用繁體中文，簡潔扼要。",
     "",

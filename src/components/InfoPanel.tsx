@@ -58,7 +58,18 @@ export function InfoPanel({ caseId, c, totalDays }: { caseId: string; c: Case; t
       const formData = new FormData();
       tenderFiles.forEach((f) => formData.append("files", f));
       const res = await fetch("/api/extract-tender", { method: "POST", body: formData });
-      const data = await res.json();
+      let data: { fields?: Record<string, unknown>; method?: string; error?: string };
+      try {
+        data = await res.json();
+      } catch {
+        // The server's own error handling (route.ts's catch block) always returns JSON — a response
+        // that fails to parse means something killed the request before our code ever ran (most
+        // likely Vercel's own platform timeout on a slow OCR+LLM request), so res.status is the only
+        // real signal available here. Surface it instead of a generic message so it's actually
+        // diagnosable rather than indistinguishable from every other failure mode.
+        await customAlert(`判讀失敗：伺服器沒有回傳正常的結果（HTTP ${res.status}），很可能是處理時間過長被中斷，請稍後再試或改用較小的檔案。`);
+        return;
+      }
       if (!res.ok) {
         await customAlert(data.error || "判讀失敗，請稍後再試。");
         return;

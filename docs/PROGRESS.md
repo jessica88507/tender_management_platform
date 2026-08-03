@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-08-04 — Assistant day-count mismatch; clearer timeout diagnostics for tender upload
+
+- [x] Fixed the assistant reporting a different "剩餘天數" than the UI (e.g. 19 vs the correct 18) — it had no
+      anchor for "today" and sometimes recomputed the day count itself from the raw deadline instead of
+      trusting the already-correct number in its context. System prompt now states today's actual date and
+      explicitly forbids recomputing given day counts.
+- [x] `InfoPanel`'s upload handler now distinguishes "server responded but with an error" from "server response
+      wasn't even valid JSON" (the latter only happens when something — most likely Vercel's own platform
+      timeout — kills the request before our route's own error handling runs) and surfaces the HTTP status in
+      that case, instead of the same generic "判讀失敗，請稍後再試" for every failure mode.
+
 ## 2026-08-03 — 招標文件自動判讀 now prefers the local LLM, falls back to regex automatically
 
 - [x] New `extractFieldsWithLLM` sends OCR'd tender text to the same self-hosted `qwen2.5:14b` powering
