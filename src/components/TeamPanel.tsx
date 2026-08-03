@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Bank, Buildings, CaretRight, Check, HardHat, PencilSimple, Plus, UsersThree, X } from "@phosphor-icons/react";
+import { AddressBook, Bank, Buildings, CaretRight, Check, HardHat, PencilSimple, Plus, UsersThree, X } from "@phosphor-icons/react";
 import { Case, Consultant, TeamGroup } from "@/lib/types";
 import { useApp } from "@/context/AppContext";
 import { uid } from "@/lib/date";
+import type { Vendor } from "./VendorDirectoryModal";
 
 const TEAM_LABELS: Record<"architect" | "jianguo", string> = {
   architect: "建築師團隊",
@@ -229,6 +230,9 @@ export function TeamPanel({ caseId, c }: { caseId: string; c: Case }) {
   // has been typed — `extraName` alone (with no member-name list anymore) is what real saved data
   // relies on, so an empty draft would otherwise collapse straight back into the ghost add-box.
   const [extraTeamJustAdded, setExtraTeamJustAdded] = useState(false);
+  const [showVendorPicker, setShowVendorPicker] = useState(false);
+  const [vendorList, setVendorList] = useState<Vendor[] | null>(null);
+  const [vendorSearch, setVendorSearch] = useState("");
 
   const setConsultantField = (idx: number, field: "role" | "company" | "contact", value: string) => {
     updateCase(caseId, (draft) => {
@@ -252,6 +256,32 @@ export function TeamPanel({ caseId, c }: { caseId: string; c: Case }) {
         team: null,
       });
     });
+  };
+  // Lazily fetched on first open, not on every panel render — the directory rarely changes mid-
+  // session, and most edits to a case's team never touch it at all.
+  const openVendorPicker = () => {
+    setShowVendorPicker(true);
+    if (!vendorList) {
+      fetch("/api/vendors")
+        .then((r) => r.json())
+        .then((data) => setVendorList(data.vendors ?? []))
+        .catch(() => setVendorList([]));
+    }
+  };
+  const addFromVendor = (v: Vendor) => {
+    updateCase(caseId, (draft) => {
+      draft.team.consultants.push({
+        id: uid(),
+        role: v.role,
+        company: v.company,
+        contact: v.contact,
+        affiliation: "",
+        custom: true,
+        team: null,
+      });
+    });
+    setShowVendorPicker(false);
+    setVendorSearch("");
   };
   const assignConsultantTeam = (consultantId: string, group: TeamGroup) => {
     updateCase(caseId, (draft) => {
@@ -498,10 +528,55 @@ export function TeamPanel({ caseId, c }: { caseId: string; c: Case }) {
                 </tbody>
               </table>
               </div>
-              <button className={btnMiniClass} onClick={addConsultant}>
-                <Plus weight="bold" size={13} />
-                新增其他顧問類別
-              </button>
+              <div className="flex gap-2 flex-wrap relative">
+                <button className={btnMiniClass} onClick={addConsultant}>
+                  <Plus weight="bold" size={13} />
+                  新增其他顧問類別
+                </button>
+                <button className={btnMiniClass} onClick={() => (showVendorPicker ? setShowVendorPicker(false) : openVendorPicker())}>
+                  <AddressBook weight="bold" size={13} />
+                  從資料庫選擇
+                </button>
+                {showVendorPicker && (
+                  <>
+                    <div className="fixed inset-0 z-[998]" onClick={() => setShowVendorPicker(false)} />
+                    <div className="absolute top-full left-0 mt-1.5 z-[999] bg-card border border-border rounded-[10px] shadow-[0_8px_24px_rgba(0,0,0,0.25)] w-[340px] max-h-[320px] flex flex-col overflow-hidden">
+                      <input
+                        autoFocus
+                        value={vendorSearch}
+                        onChange={(e) => setVendorSearch(e.target.value)}
+                        placeholder="搜尋角色或公司名稱…"
+                        className="shrink-0 border-b border-border py-2 px-3 text-[15px] bg-card focus:outline-none"
+                      />
+                      <div className="flex-1 overflow-y-auto">
+                        {vendorList === null ? (
+                          <div className="text-ink-soft text-[14px] py-3 px-3">載入中…</div>
+                        ) : (
+                          (() => {
+                            const q = vendorSearch.trim().toLowerCase();
+                            const filtered = q
+                              ? vendorList.filter((v) => `${v.role}${v.company}`.toLowerCase().includes(q))
+                              : vendorList;
+                            if (filtered.length === 0) {
+                              return <div className="text-ink-soft text-[14px] py-3 px-3">沒有符合的資料，可以到「廠商／顧問資料庫」新增。</div>;
+                            }
+                            return filtered.map((v) => (
+                              <button
+                                key={v.id}
+                                onClick={() => addFromVendor(v)}
+                                className="w-full text-left py-2 px-3 hover:bg-accent/10 cursor-pointer border-b border-dashed border-border last:border-b-0"
+                              >
+                                <div className="text-[15px] font-bold text-ink">{v.role}</div>
+                                <div className="text-[13.5px] text-ink-soft">{v.company || "—"}{v.contact ? `・${v.contact}` : ""}</div>
+                              </button>
+                            ));
+                          })()
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </>
         )}

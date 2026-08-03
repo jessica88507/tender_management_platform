@@ -5,6 +5,24 @@
 
 ---
 
+## 2026-08-03 — Company-wide vendor/consultant directory (廠商顧問資料庫), with a real PATCH bug found and fixed during verification
+
+- [x] New `vendor_directory` table + `/api/vendors` (list/create) and `/api/vendors/[id]` (edit/delete) routes;
+      `VendorDirectoryModal.tsx` (accessible from the sidebar) lets any member maintain one shared company-wide
+      list; `TeamPanel.tsx` gained a "從資料庫選擇" button that opens a searchable picker and imports a picked
+      entry straight into the active case's 專業顧問明細.
+- [x] Verification (manual browser testing, not just type-check) surfaced a real bug before it shipped: the
+      PATCH route required `role` on every request and defaulted every other field not present in the request
+      body to `""`. Since the modal intentionally saves one field at a time on blur, this meant every save
+      after the first either 400'd (partial patch missing `role`) or silently wiped the row's other fields to
+      empty — confirmed via network-request logs, not guessed. Fixed by only touching keys actually present in
+      the request body (a merge-patch instead of a full overwrite). See `DECISIONS.md` #45.
+- [x] Re-verified after the fix: all six fields (role/company/contact/phone/email/notes) now save
+      independently without clobbering each other, confirmed via direct API fetch and a full page reload. Also
+      tested `TeamPanel`'s "從資料庫選擇" picker end-to-end (open → search → pick → imported row persists after
+      reload), then cleaned up the test vendor entry and test consultant row used for verification.
+- [x] `npx tsc --noEmit` and `npx eslint .` both clean.
+
 ## 2026-08-04 — The upload 504 was our own maxDuration=60, not the file/plan — raised to 300s
 
 - [x] A 1MB file still 504'd on 招標文件自動判讀 in production. Checked the actual Vercel project settings

@@ -78,6 +78,13 @@
       "when": 1785312372313,
       "tag": "0010_bumpy_rumiko_fujikawa",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1785746970149,
+      "tag": "0011_chunky_scourge",
+      "breakpoints": true
     }
   ]
 }

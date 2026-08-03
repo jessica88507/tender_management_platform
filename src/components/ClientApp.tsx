@@ -11,6 +11,7 @@ import { MainView } from "@/components/MainView";
 import { LoginScreen } from "@/components/LoginScreen";
 import { AdminShell } from "@/components/AdminShell";
 import { AssistantChat } from "@/components/AssistantChat";
+import { VendorDirectoryModal } from "@/components/VendorDirectoryModal";
 
 function AppShell({
   userName,
@@ -22,6 +23,7 @@ function AppShell({
   const { setActiveId, loading } = useApp();
   const [explicitNew, setExplicitNew] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [showVendors, setShowVendors] = useState(false);
   const mainRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -41,6 +43,7 @@ function AppShell({
             setActiveId(null);
             setExplicitNew(true);
           }}
+          onShowVendors={() => setShowVendors(true)}
         />
         {loading ? (
           <div className="flex-1 flex items-center justify-center text-ink-soft text-[18px]">載入案件資料中…</div>
@@ -61,6 +64,7 @@ function AppShell({
         <ArrowUp weight="bold" size={18} />
       </button>
       <AssistantChat />
+      {showVendors && <VendorDirectoryModal onClose={() => setShowVendors(false)} />}
     </div>
   );
 }

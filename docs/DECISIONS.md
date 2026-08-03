@@ -850,3 +850,26 @@ assumed. No code logic changed, purely removing a now-known-unnecessary self-imp
 **Consequence**: If the user ever disables Fluid Compute, or moves this project to a plan without it, `300`
 would be rejected at deploy time (Vercel validates `maxDuration` against the plan's actual limit) — worth
 checking this setting again if a future deploy starts failing at build time with a duration-related error.
+
+## 45. Company-wide vendor/consultant directory, importable into any case's team — and a per-field-save PATCH bug this surfaced
+
+**Context**: The user wants a shared 廠商/顧問 (vendor/consultant) directory that any 業務部 member can maintain
+once, then pull entries from into a case's 專業顧問明細 instead of retyping the same company/contact info every
+time a new case is created.
+**Decision**: New standalone `vendor_directory` table (`src/db/schema.ts`), not scoped to any case or user —
+same "everyone sees and edits the same shared list" model the app already uses for cases themselves. `GET/POST
+/api/vendors` (list/create) and `PATCH/DELETE /api/vendors/[id]` (per-row edit/delete). `VendorDirectoryModal.tsx`
+renders an editable table where each `<input>` saves independently `onBlur`, and `TeamPanel.tsx` gained a "從資料庫選擇"
+button next to "新增其他顧問類別" that opens a searchable popover reading the same `/api/vendors` list and pushes
+the picked entry into `case.team.consultants` as a normal custom consultant row.
+**Bug found during verification, fixed in the same batch**: the PATCH handler originally required `body.role` on
+every request and defaulted every field *absent* from the request body to `""`. Since `saveField` intentionally
+sends only the one changed field (that's the whole point of per-field `onBlur` saves), every save after the
+first **either failed with 400** (no `role` in the partial patch) **or silently wiped every other field back to
+""** — confirmed directly via network-request logs during manual testing (a `company`-only save 400'd; a
+follow-up test showed the wipe). Fixed by only touching keys actually present in the request body (`"role" in
+body` check instead of requiring it unconditionally, and only setting a Drizzle `.set()` key when that key is
+present in `body`) — effectively a merge-patch instead of a full-overwrite.
+**Consequence**: Any future per-row editable table in this app that saves one field at a time on blur must use
+this same "only touch present keys" PATCH pattern — a full-overwrite PATCH is only safe when the client always
+sends the complete row.

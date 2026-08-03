@@ -219,6 +219,23 @@ export const teamMembers = pgTable(
   (t) => [index("team_members_case_id_idx").on(t.caseId)]
 );
 
+// 廠商／顧問資料庫 — company-wide, reusable across cases (unlike `consultants` above, which is one
+// case's own team roster). Lets a member pick a previously-used vendor into a new case's team
+// instead of retyping the same company/contact every time. Deliberately not tied to any case or
+// user — every member can see and use the same shared directory, matching how cases themselves are
+// already visible/editable by anyone in this app.
+export const vendorDirectory = pgTable("vendor_directory", {
+  id: uuid(),
+  role: text("role").notNull(), // e.g. 結構技師, 大地技師 — same vocabulary as consultants.role
+  company: text("company").notNull().default(""),
+  contact: text("contact").notNull().default(""),
+  phone: text("phone").notNull().default(""),
+  email: text("email").notNull().default(""),
+  notes: text("notes").notNull().default(""),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 // 專業顧問，可拖曳分類到 建築師團隊 / 建國工程團隊
 export const consultants = pgTable(
   "consultants",

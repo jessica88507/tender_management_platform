@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { CaretLineLeft, CaretLineRight, LockSimple, Plus } from "@phosphor-icons/react";
+import { AddressBook, CaretLineLeft, CaretLineRight, LockSimple, Plus } from "@phosphor-icons/react";
 import { useApp } from "@/context/AppContext";
 import { caseDaysLeft, canEditCase } from "@/lib/derived";
 
 const COLLAPSE_KEY = "bid-scheduler-sidebar-collapsed";
 
-export function Sidebar({ onShowNew }: { onShowNew: () => void }) {
+export function Sidebar({ onShowNew, onShowVendors }: { onShowNew: () => void; onShowVendors: () => void }) {
   const { state, activeId, setActiveId, currentUserId } = useApp();
   const [collapsed, setCollapsed] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -46,6 +46,13 @@ export function Sidebar({ onShowNew }: { onShowNew: () => void }) {
           className="w-8 h-8 flex items-center justify-center rounded-md border-[1.5px] border-dashed border-accent text-accent cursor-pointer hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           <Plus weight="bold" size={14} />
+        </button>
+        <button
+          onClick={onShowVendors}
+          title="廠商／顧問資料庫"
+          className="w-8 h-8 flex items-center justify-center rounded-md text-ink-soft cursor-pointer hover:bg-accent/10 hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        >
+          <AddressBook weight="bold" size={16} />
         </button>
       </div>
     );
@@ -99,6 +106,13 @@ export function Sidebar({ onShowNew }: { onShowNew: () => void }) {
       >
         <Plus weight="bold" size={16} />
         新增案件
+      </button>
+      <button
+        onClick={onShowVendors}
+        className="w-full mt-2 py-2 px-3.5 rounded-l-lg text-ink-soft text-[16px] cursor-pointer hover:bg-accent/10 hover:text-accent flex items-center justify-center gap-1.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      >
+        <AddressBook weight="bold" size={14} />
+        廠商／顧問資料庫
       </button>
     </div>
   );
