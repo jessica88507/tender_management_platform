@@ -3,7 +3,6 @@ import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { cases, consultants, tasks, teamMembers, users, weekNotes } from "@/db/schema";
-import { canEditCase } from "@/lib/caseMapper";
 import type { Case } from "@/lib/types";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -18,6 +17,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   // takes over the case.
 
   const body = (await request.json()) as Case;
+
+  // Optimistic concurrency check: the client echoes back the `updatedAt` it last saw. If that no
+  // longer matches the row (someone else — another tab, another person — saved in between), this
+  // PATCH is built from stale local state and would silently clobber their newer save. Reject it
+  // instead; the client re-fetches this case fresh rather than overwriting. Cases opened in a tab
+  // from before this field existed send no `updatedAt` — skip the check for those rather than
+  // hard-failing every save until every open tab happens to reload.
+  if (body.updatedAt && new Date(body.updatedAt).getTime() !== new Date(existing.updatedAt).getTime()) {
+    return NextResponse.json(
+      { error: "這個案件已被其他分頁或其他人儲存過較新的內容，為避免覆蓋掉它，這次儲存已取消，請重新整理頁面。", conflict: true },
+      { status: 409 }
+    );
+  }
 
   // 主投標手 always mirrors the actual owning account's real name — never trusted as free text
   // from the client. Default: the case is "claimed" by whoever is editing it, if nobody owns it
@@ -34,6 +46,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     ownerName = targetUser.name ?? "";
   }
 
+  const savedAt = new Date();
   await db.transaction(async (tx) => {
     await tx
       .update(cases)
@@ -62,7 +75,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         architectTeamName: body.team?.architectName ?? "",
         extraTeamName: body.team?.extraName ?? "",
         categoryOrder: body.categoryOrder ?? null,
-        updatedAt: new Date(),
+        updatedAt: savedAt,
       })
       .where(eq(cases.id, id));
 
@@ -118,19 +131,22 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, updatedAt: savedAt.toISOString() });
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Only the system administrator may delete a case now — regular members (including a case's own
+  // 主投標手) no longer have any delete affordance in the UI at all; enforced here too so this
+  // can't be triggered by a direct API call either.
+  if (session.user.role !== "admin") {
+    return NextResponse.json({ error: "只有系統管理員能刪除案件" }, { status: 403 });
+  }
 
   const { id } = await params;
   const existing = await db.query.cases.findFirst({ where: eq(cases.id, id) });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (!canEditCase(existing, session.user.id)) {
-    return NextResponse.json({ error: "只有主投標手能刪除這個案件" }, { status: 403 });
-  }
 
   await db.delete(cases).where(eq(cases.id, id));
   return NextResponse.json({ ok: true });

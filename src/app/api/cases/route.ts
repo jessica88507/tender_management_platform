@@ -59,6 +59,7 @@ export async function POST(request: Request) {
     weekNotes: {},
     team: normalizeTeam(undefined),
     tasks: [],
+    updatedAt: new Date().toISOString(),
   };
   normalizeCase(draft);
   const templates = await getTaskTemplateRows();
@@ -132,5 +133,6 @@ export async function POST(request: Request) {
     return created;
   });
 
+  draft.updatedAt = newCase.updatedAt.toISOString();
   return NextResponse.json({ id: newCase.id, case: draft });
 }

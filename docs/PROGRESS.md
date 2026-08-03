@@ -5,6 +5,21 @@
 
 ---
 
+## 2026-08-03 — Fixed case-save data loss; case deletion restricted to admin
+
+- [x] Found and fixed two real bugs behind "my edits disappear / revert to old content": (1) a pending
+      debounced save was silently dropped if the tab closed before the 400ms timer fired — now flushed via
+      `beforeunload`/`pagehide` + `fetch keepalive`; (2) no conflict detection — the last save to land always
+      fully overwrote the row even if someone else had saved newer data in between. Added `updatedAt`-based
+      optimistic concurrency checking (`409` + re-fetch-fresh on conflict) to `PATCH /api/cases/[id]`. See
+      `DECISIONS.md` #39.
+- [x] Case deletion is now admin-only, enforced server-side in `DELETE /api/cases/[id]`. Removed the
+      member-facing floating "專案管理" button and `ProjectManagerModal` entirely (deleted the file); added a
+      working 刪除 button to the admin's `AdminProjectsPanel` (previously read-only). See `DECISIONS.md` #40.
+- [x] Verified live against the real dev server + Postgres for both changes (conflict-rejection, successful
+      save, member 403 vs admin 404-on-fake-id, floating button gone from member view, delete button present
+      for admin).
+
 ## 2026-07-30 — Fixed the real cause of the production upload failure: missing pdfjs worker file
 
 - [x] The error-surfacing fix immediately paid off: the actual production error was `Cannot find module

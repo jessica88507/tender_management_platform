@@ -2,13 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
-import { ArrowUp, FolderOpen } from "@phosphor-icons/react";
+import { ArrowUp } from "@phosphor-icons/react";
 import { AppProvider, useApp } from "@/context/AppContext";
 import { ConfirmProvider } from "@/context/ConfirmContext";
 import { Header } from "@/components/Header";
 import { Sidebar } from "@/components/Sidebar";
 import { MainView } from "@/components/MainView";
-import { ProjectManagerModal } from "@/components/ProjectManagerModal";
 import { LoginScreen } from "@/components/LoginScreen";
 import { AdminShell } from "@/components/AdminShell";
 
@@ -21,7 +20,6 @@ function AppShell({
 }) {
   const { setActiveId, loading } = useApp();
   const [explicitNew, setExplicitNew] = useState(false);
-  const [showManager, setShowManager] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const mainRef = useRef<HTMLElement | null>(null);
 
@@ -50,13 +48,6 @@ function AppShell({
         )}
       </div>
       <button
-        onClick={() => setShowManager(true)}
-        className="fixed left-4.5 bottom-4.5 z-[500] bg-ink text-card border-none py-3 px-5 rounded-3xl text-[18px] font-bold cursor-pointer shadow-[0_4px_14px_rgba(0,0,0,0.3)] hover:bg-primary flex items-center gap-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-highlight"
-      >
-        <FolderOpen weight="fill" size={16} />
-        專案管理
-      </button>
-      <button
         onClick={() => mainRef.current?.scrollTo({ top: 0, behavior: "smooth" })}
         title="回到頂部"
         aria-hidden={!showBackToTop}
@@ -68,7 +59,6 @@ function AppShell({
       >
         <ArrowUp weight="bold" size={18} />
       </button>
-      {showManager && <ProjectManagerModal onClose={() => setShowManager(false)} />}
     </div>
   );
 }

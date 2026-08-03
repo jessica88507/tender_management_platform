@@ -30,6 +30,7 @@ type CaseRow = {
   extraTeamName: string;
   categoryOrder: string[] | null;
   createdByUserId: string | null;
+  updatedAt: Date | string;
   tasks: {
     id: string;
     key: string | null;
@@ -130,6 +131,7 @@ export function rowToCase(row: CaseRow): Case {
     weekNotes,
     team: { architectName: row.architectTeamName, architect, mep, extraName: row.extraTeamName, extraMembers, consultants },
     tasks,
+    updatedAt: new Date(row.updatedAt).toISOString(),
   };
 }
 

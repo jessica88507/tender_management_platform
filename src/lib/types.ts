@@ -78,6 +78,10 @@ export type Case = {
   weekNotes: Record<string, string>;
   team: Team;
   tasks: Task[];
+  // Server-assigned save timestamp (ISO string) — the client echoes this back on PATCH so the
+  // server can detect "someone else saved this case in between" and reject instead of silently
+  // overwriting their newer data. See PATCH /api/cases/[id].
+  updatedAt: string;
 };
 
 export type AppState = {

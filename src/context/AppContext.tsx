@@ -40,7 +40,6 @@ type AppContextValue = {
   setTeamOpen: (v: boolean) => void;
   updateCase: (id: string, updater: (c: Case) => void) => void;
   createCase: (data: { name: string; workStart: string; deadline: string }) => void;
-  deleteCase: (id: string) => void;
   // Set to the new case's id right after createCase succeeds — CaseView compares this against
   // its own caseId (once, via the "adjust state during render" pattern) to decide whether to
   // auto-show the 新手教學 onboarding tutorial. See OnboardingTutorial.tsx.
@@ -108,31 +107,85 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Actually sends one case's pending save — factored out of the setTimeout body so the
+  // beforeunload flush below can call the exact same logic synchronously-ish (via fetch's
+  // `keepalive`) instead of waiting for the normal 400ms debounce, which would otherwise just get
+  // dropped when the tab closes before it fires.
+  const sendSave = useCallback(
+    async (id: string, payload: Case, opts?: { keepalive?: boolean }) => {
+      try {
+        const res = await fetch(`/api/cases/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          keepalive: opts?.keepalive,
+        });
+        const resBody = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          if (res.status === 409) {
+            // Someone else saved this case in between — our local copy is stale and would have
+            // clobbered their newer data. Re-fetch this one case fresh rather than retrying with
+            // the same stale payload (which would just 409 again).
+            await customAlert(resBody.error || "這個案件已被其他人更新過，將重新載入最新內容。");
+            const fresh = await fetch(`/api/cases/${id}`).then((r) => (r.ok ? r.json() : null));
+            if (fresh?.cases?.[id]) {
+              setState((prev) => ({ ...prev, cases: { ...prev.cases, [id]: fresh.cases[id] } }));
+            }
+            return;
+          }
+          throw new Error(resBody.error || `PATCH failed: ${res.status}`);
+        }
+        if (resBody.updatedAt) {
+          setState((prev) => {
+            const current = prev.cases[id];
+            if (!current) return prev;
+            return { ...prev, cases: { ...prev.cases, [id]: { ...current, updatedAt: resBody.updatedAt } } };
+          });
+        }
+      } catch (err) {
+        console.error(err);
+        await customAlert(err instanceof Error ? err.message : "儲存失敗，請稍後再試。");
+      }
+    },
+    [customAlert]
+  );
+
   const persistCase = useCallback(
     (id: string, caseData: Case) => {
       pendingSaves.current[id] = caseData;
       if (saveTimers.current[id]) clearTimeout(saveTimers.current[id]);
-      saveTimers.current[id] = setTimeout(async () => {
+      saveTimers.current[id] = setTimeout(() => {
         const payload = pendingSaves.current[id];
         delete pendingSaves.current[id];
-        try {
-          const res = await fetch(`/api/cases/${id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          if (!res.ok) {
-            const body = await res.json().catch(() => ({}));
-            throw new Error(body.error || `PATCH failed: ${res.status}`);
-          }
-        } catch (err) {
-          console.error(err);
-          await customAlert(err instanceof Error ? err.message : "儲存失敗，請稍後再試。");
-        }
+        delete saveTimers.current[id];
+        sendSave(id, payload);
       }, 400);
     },
-    [customAlert]
+    [sendSave]
   );
+
+  // Without this, editing a field and closing/navigating away within the 400ms debounce window
+  // silently drops the edit — nothing ever sends it. `keepalive` lets the request outlive page
+  // unload (unlike a plain fetch, which the browser can cancel mid-flight on navigation).
+  useEffect(() => {
+    const flushPendingSaves = () => {
+      Object.keys(pendingSaves.current).forEach((id) => {
+        if (saveTimers.current[id]) {
+          clearTimeout(saveTimers.current[id]);
+          delete saveTimers.current[id];
+        }
+        const payload = pendingSaves.current[id];
+        delete pendingSaves.current[id];
+        sendSave(id, payload, { keepalive: true });
+      });
+    };
+    window.addEventListener("beforeunload", flushPendingSaves);
+    window.addEventListener("pagehide", flushPendingSaves);
+    return () => {
+      window.removeEventListener("beforeunload", flushPendingSaves);
+      window.removeEventListener("pagehide", flushPendingSaves);
+    };
+  }, [sendSave]);
 
   const applyCaseUpdate = useCallback(
     (id: string, updater: (c: Case) => void) => {
@@ -196,30 +249,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [setActiveId, customAlert]
   );
 
-  const deleteCase = useCallback(
-    (id: string) => {
-      setState((prev) => {
-        const nextCases = { ...prev.cases };
-        delete nextCases[id];
-        return { ...prev, cases: nextCases };
-      });
-      setActiveIdRaw((prev) => (prev === id ? null : prev));
-      (async () => {
-        try {
-          const res = await fetch(`/api/cases/${id}`, { method: "DELETE" });
-          if (!res.ok) {
-            const body = await res.json().catch(() => ({}));
-            throw new Error(body.error || `DELETE failed: ${res.status}`);
-          }
-        } catch (err) {
-          console.error(err);
-          await customAlert(err instanceof Error ? err.message : "刪除失敗，請稍後再試。");
-        }
-      })();
-    },
-    [customAlert]
-  );
-
   const activeCase = activeId ? state.cases[activeId] ?? null : null;
   const isCaseOwner = activeCase ? canEditCase(activeCase, currentUserId) : true;
 
@@ -240,7 +269,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setTeamOpen: (v) => setUi((prev) => ({ ...prev, teamOpen: v })),
     updateCase,
     createCase,
-    deleteCase,
     justCreatedId,
   };
 

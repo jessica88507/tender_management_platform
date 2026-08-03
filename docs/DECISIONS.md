@@ -685,3 +685,51 @@ a complete one either).
 access to the user's deployment logs) — it fixes the UI lying about the outcome. If the user still sees "0
 個欄位" after this ships, that's a real, honestly-reported extraction failure worth investigating further
 (e.g. via Vercel's function logs), not a UI illusion of success.
+
+## 39. Case saves are debounced full-object overwrites with no unload-flush or conflict detection
+
+**Context**: User reported cases/edits "disappearing" — reverting to older content on reopen, as if the
+database "changes on its own." Reading `AppContext.tsx`'s save path (`persistCase`/`applyCaseUpdate`) found
+two real, independent bugs: (1) every edit is debounced 400ms before it's sent to `PATCH /api/cases/[id]`, and
+nothing flushes that pending save if the tab closes/navigates away first — the edit is just silently dropped,
+never sent; (2) the PATCH replaces the *entire* case row (plus wholesale delete+reinsert of its tasks/team/
+consultants/weekNotes) with whatever the client's local in-memory copy looks like — there was no check that
+the row hadn't been saved by someone else (another tab, another person, a long-idle stale tab) since this
+client last fetched it. Whichever save happened to land last would silently overwrite anything saved in
+between, with zero warning — exactly "reverts to old content."
+**Decision**:
+- Added `updatedAt: string` to the `Case` type (`caseMapper.ts`'s `rowToCase`, both `POST`/`PATCH /api/cases`
+  routes). `PATCH` now compares the client-sent `updatedAt` against the row's actual current `updatedAt`
+  before writing — a mismatch means someone else saved in between, and the request is rejected with `409`
+  instead of overwriting (a case loaded before this shipped sends no `updatedAt` at all, so the check is
+  skipped for those rather than hard-failing every save until every open tab happens to reload — pure upgrade
+  path, no forced-refresh moment). On success, the new `updatedAt` is returned and echoed into local state, so
+  the client's *own* next save doesn't spuriously conflict with itself.
+- `AppContext.tsx`'s `persistCase` was refactored so the actual send logic (`sendSave`) is shared between the
+  normal 400ms-debounced path and a new `beforeunload`/`pagehide` listener that flushes any still-pending save
+  immediately via `fetch(..., { keepalive: true })` — `keepalive` is what lets the request actually complete
+  after the page starts unloading, unlike a plain `fetch` the browser can cancel mid-flight on navigation.
+- On a `409`, the client re-fetches that one case fresh from the server (discarding the stale optimistic local
+  state that couldn't be saved anyway) instead of retrying the same payload, which would just conflict again.
+**Verification**: `npx tsc --noEmit` / `npx eslint` clean. Live-tested against the real dev server + Postgres:
+crafted a PATCH with a deliberately stale `updatedAt` via `fetch` from the browser console — confirmed `409`
+with the conflict message and no data change; confirmed a PATCH with the current `updatedAt` still succeeds
+normally and returns a fresh one.
+
+## 40. Case deletion restricted to admin; member-facing 專案管理 floating button removed
+
+**Context**: User asked that only the system administrator be able to delete a case, and that the member-facing
+floating "專案管理" button (bottom-left, opening `ProjectManagerModal` — a cross-case table with 開啟/刪除 per
+row) be removed entirely, rather than just hiding its delete action.
+**Decision**: `DELETE /api/cases/[id]` now checks `session.user.role === "admin"` before anything else (no
+longer `canEditCase`/case-ownership based) — enforced server-side, not just hidden in the UI. Removed the
+floating button, `ProjectManagerModal` usage, and its `showManager` state from `ClientApp.tsx`'s member
+`AppShell`; deleted `ProjectManagerModal.tsx` outright (no other caller) along with `deleteCase` from
+`AppContext.tsx`'s public API (dead code once its only caller was gone). Added a 刪除 column to
+`AdminProjectsPanel.tsx` (previously read-only) — same confirm-then-DELETE pattern the old modal used, via
+`useConfirm()` (available since `ClientApp.tsx` already wraps `AdminShell` in `ConfirmProvider`).
+**Verification**: `npx tsc --noEmit` / `npx eslint` clean. Logged into the real dev server as both a member and
+the admin account: confirmed the floating button is gone from the member view; confirmed `AdminProjectsPanel`
+now renders a working 刪除 button; confirmed via direct `fetch` calls that a member's `DELETE` call gets `403`
+("只有系統管理員能刪除案件") while the admin's succeeds (tested against a nonexistent id to avoid touching
+real data — got the expected `404` past the role check, proving the check itself passes for admin).

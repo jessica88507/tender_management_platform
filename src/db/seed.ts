@@ -84,6 +84,7 @@ async function main() {
     deadline: "2026-11-06T10:00",
     bidLead: user.name ?? "陳志明",
     bidLeadUserId: user.id,
+    updatedAt: new Date().toISOString(),
     meetingWeekday: 2,
     contractAmount: 9200000000,
     siteArea: 3200,
