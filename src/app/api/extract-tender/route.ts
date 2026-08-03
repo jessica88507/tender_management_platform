@@ -17,12 +17,14 @@ const MAX_FILES = 5;
 const MAX_FILE_BYTES = 15 * 1024 * 1024;
 const SUPPORTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
-// OCR (tesseract.js) alone can take 7-9+ seconds per scanned page, plus tesseract.js re-downloads
-// its chi_tra+eng language data on every cold start (cachePath is pinned to /tmp, which doesn't
-// persist between invocations on Vercel) — a multi-page scanned upload can easily exceed Vercel's
-// default serverless timeout (10s on Hobby) well before OCR even finishes. Raised explicitly so a
-// slow-but-working extraction doesn't get killed mid-request and surface as a generic failure.
-export const maxDuration = 60;
+// OCR (tesseract.js) alone can take 7-9+ seconds per scanned page (plus re-downloading its
+// chi_tra+eng language data on every cold start, since /tmp doesn't persist between invocations on
+// Vercel), and the LLM field-extraction step adds its own prompt-eval time on top of that — a
+// production 504 confirmed the previous 60s cap here (not the file size, not the Vercel plan) was
+// the actual bottleneck: this project's Hobby plan has Fluid Compute enabled, which raises Vercel's
+// own ceiling to 300s, so there was 240s of headroom being left on the table. Raised to the max
+// this plan actually allows.
+export const maxDuration = 300;
 
 export async function POST(request: Request) {
   const session = await auth();

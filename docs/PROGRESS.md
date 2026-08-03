@@ -5,6 +5,15 @@
 
 ---
 
+## 2026-08-04 — The upload 504 was our own maxDuration=60, not the file/plan — raised to 300s
+
+- [x] A 1MB file still 504'd on 招標文件自動判讀 in production. Checked the actual Vercel project settings
+      (Hobby plan, Fluid Compute **enabled**) against Vercel's current docs: Fluid Compute raises Hobby's
+      function-duration ceiling to 300s, not the 10s most people assume — `maxDuration = 60`, set defensively
+      before this was confirmed, was leaving 240s of headroom unused and getting killed by our own limit, not
+      a plan restriction. Raised to `300` in both `extract-tender/route.ts` and `assistant/chat/route.ts`. See
+      `DECISIONS.md` #44.
+
 ## 2026-08-04 — 系統助理 latency breakdown surfaced; animated "思考中" indicator
 
 - [x] User asked why responses take ~15s — model weakness, or the local/tunnel setup? Added real timing

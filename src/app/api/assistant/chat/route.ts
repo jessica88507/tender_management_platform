@@ -14,8 +14,11 @@ const MAX_HISTORY = 20;
 
 // Local self-hosted model reached through a Cloudflare Tunnel (see docs/DECISIONS.md) — no
 // per-request API cost, but genuinely slower than a hosted API and dependent on the user's own
-// machine being on and reachable, hence the generous timeout.
-export const maxDuration = 60;
+// machine being on and reachable. Matches extract-tender/route.ts's cap: this project's Hobby plan
+// has Fluid Compute enabled, which raises Vercel's own ceiling to 300s, so there's no reason to
+// leave a tighter, arbitrary limit in place — a cold model reload (Ollama unloads after idling)
+// plus a large case's task list could plausibly need more than 60s on a bad day.
+export const maxDuration = 300;
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 

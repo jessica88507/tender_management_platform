@@ -830,3 +830,23 @@ this class of bug the way `caseDaysLeft` now is.
 case under `TZ=UTC`, `TZ=Asia/Taipei`, and `TZ=America/New_York` (Node respects `process.env.TZ` for `Date`'s
 local-time interpretation) — all three returned the identical day count after the fix, confirming it's now
 genuinely timezone-independent rather than accidentally-correct-in-one-timezone.
+
+## 44. `maxDuration = 60` was the actual cause of production's upload 504 — raised to 300s
+
+**Context**: A small (1MB) file still hit a production `504` on 招標文件自動判讀. Before assuming this meant
+the file/plan was the problem, checked the user's actual Vercel project settings: Hobby plan, but with
+**Fluid Compute enabled**. Per Vercel's own current docs (`/docs/functions/configuring-functions/duration`),
+Fluid Compute raises Hobby's function-duration ceiling to a default *and* maximum of 300 seconds (not the
+10s most people assume Hobby is capped at) — so this project already had 240 unused seconds of headroom that
+`export const maxDuration = 60` (set defensively early in this session, before this was confirmed) was
+throwing away on every request. The 504 was Vercel enforcing *our own* self-imposed limit, not a plan
+limitation — combining OCR (which can run 7-9s/page) with the newly-added LLM field-extraction step (#42, whose
+prompt-eval time scales with input size — the same effect measured directly for 系統助理's chat, where 13.7 of
+14.8 total seconds went to prompt eval alone) pushed real requests past 60s even though the file itself was
+small; file size and processing time aren't the same axis.
+**Decision**: Raised `maxDuration` to `300` in both `extract-tender/route.ts` and `assistant/chat/route.ts` —
+the actual ceiling this Hobby+Fluid-Compute project supports, confirmed via Vercel's own docs rather than
+assumed. No code logic changed, purely removing a now-known-unnecessary self-imposed cap.
+**Consequence**: If the user ever disables Fluid Compute, or moves this project to a plan without it, `300`
+would be rejected at deploy time (Vercel validates `maxDuration` against the plan's actual limit) — worth
+checking this setting again if a future deploy starts failing at build time with a duration-related error.
