@@ -83,13 +83,14 @@ export function InfoPanel({ caseId, c, totalDays }: { caseId: string; c: Case; t
         if (typeof fields.specialNotes === "string" && fields.specialNotes) { draft.specialNotes = fields.specialNotes; filledCount++; }
       });
       setTenderFiles([]);
+      const methodLabel = data.method === "llm" ? "本機模型" : "關鍵字比對";
       // Previously this alert fired unconditionally on any 200 response — even when `fields` came
       // back empty (OCR ran but nothing matched a known label), which silently looked like success
       // while filling in nothing. Report the actual count so a real failure is visible as one.
       if (filledCount === 0) {
-        await customAlert("文件已讀取，但沒有辨識出任何欄位，請手動填寫。（此功能對非制式招標公告格式的文件辨識率較低）");
+        await customAlert(`文件已讀取（${methodLabel}），但沒有辨識出任何欄位，請手動填寫。`);
       } else {
-        await customAlert(`已自動帶入 ${filledCount} 個欄位的判讀結果，請確認欄位內容正確無誤後再儲存。`);
+        await customAlert(`已透過${methodLabel}自動帶入 ${filledCount} 個欄位的判讀結果，請確認欄位內容正確無誤後再儲存。`);
       }
     } catch (err) {
       console.error(err);

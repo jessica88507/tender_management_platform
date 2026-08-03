@@ -771,3 +771,33 @@ through the actual Cloudflare Tunnel: asked "這個案子還剩幾天？主投�
 got a correctly-grounded answer matching the case's actual displayed data (not a hallucination). Separately
 asked it to change the case's contract amount — confirmed it refused and pointed back to the UI, exactly per
 the read-only scoping in the system prompt, rather than claiming to have done it.
+
+## 42. 招標文件自動判讀's field extraction now prefers the local LLM over regex, with automatic fallback
+
+**Context**: With the self-hosted `qwen2.5:14b` already wired up for 系統助理 (#41), the user asked whether the
+same local model could also replace `parseFields.ts`'s keyword/regex matching for 招標文件自動判讀 — the
+regex approach's accuracy limits (documented in `CLAUDE.md`: unreliable on freeform/non-standard layouts, a
+label OCR misread just returns null) are exactly the class of problem an LLM generalizes past.
+**Decision**: OCR/text extraction (`extractTenderText`) is unchanged — only what parses the resulting text
+changed. New `src/lib/tenderExtract/parseFieldsWithLLM.ts` (`extractFieldsWithLLM`) sends the extracted text
+(capped at 8000 chars — real documents never need more; this is the header/basic-info section, never the
+tail) to the local model's `/api/generate` with Ollama's `format: "json"` mode plus an explicit prompt
+covering the exact same 15 fields as `TenderFields`, with the same ROC-year and 億/萬-money conversion rules
+`parseFields.ts` already encodes in regex form, spelled out in prose instead. Every returned value is
+type-checked against its expected field type (number fields coerced to `null` if not a finite number, text
+fields trimmed/length-capped) before being trusted — the model returning valid JSON doesn't guarantee it
+matches the schema, `format: "json"` only guarantees syntactic validity. Also ported `parseFields.ts`'s
+"buildingType falls back to floorCount" rule (the two fields describe overlapping information in most real
+documents), since the LLM path was initially leaving `buildingType` null in exactly the cases the regex
+version's fallback exists for.
+`extract-tender/route.ts` tries `extractFieldsWithLLM` first; **any** failure (env vars unset, network error,
+invalid JSON, the user's machine being off) is caught and silently falls through to the existing
+`parseTenderFields` regex parser rather than failing the request — a down/unreachable self-hosted model must
+never regress the feature below what it already did before this existed. The response now also reports
+`method: "llm" | "regex"`, surfaced in `InfoPanel`'s success alert so the user can tell which one actually ran.
+**Verification**: `npx tsc --noEmit` / `npx eslint` clean. Ran `extractFieldsWithLLM` directly (via a throwaway
+`tsx` script, bypassing the HTTP layer — same method used throughout this project for testing server-only
+code) against a realistic synthetic 政府電子採購網 tender announcement covering every field, including ROC
+dates ("114年06月10日"), a 億+萬 mixed amount ("新台幣18億5,000萬元"), and a time-of-day deadline. Got all 15
+fields back correct on the first pass except `buildingType` (null); after adding the floorCount fallback,
+re-ran and got all 15/15 fields correct.

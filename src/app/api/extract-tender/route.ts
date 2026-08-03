@@ -2,13 +2,16 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { extractTenderText } from "@/lib/tenderExtract/extractText";
 import { parseTenderFields } from "@/lib/tenderExtract/parseFields";
+import { extractFieldsWithLLM } from "@/lib/tenderExtract/parseFieldsWithLLM";
 
-// Rule-based (OCR + keyword/regex) extraction — no external AI API, so no per-request cost and no
-// API key to provision. Runs entirely inside this one serverless function: pdfjs-dist reads a
-// PDF's text layer directly (pure JS, no native deps), and tesseract.js OCRs plain image uploads
-// (ships its own WASM binary, no system Tesseract install needed) — both fit Vercel's serverless
-// Node runtime. See docs/DECISIONS.md for why this replaced the earlier Anthropic-API version and
-// what its accuracy trade-offs are.
+// OCR + text extraction always runs the same way regardless of what parses the resulting text (no
+// external AI API for that half — see docs/DECISIONS.md for why the original Anthropic-API version
+// was replaced). Field extraction itself now prefers the user's self-hosted LLM (LOCAL_LLM_URL/
+// LOCAL_LLM_SECRET, same one powering 系統助理) when configured and reachable, since it generalizes
+// far better to varied document layouts than the keyword/regex fallback — but a down/unreachable
+// local model (a real risk: it depends on the user's own machine being on) must never make this
+// feature regress below the regex parser's baseline, so any LLM failure here is swallowed and falls
+// through to it rather than failing the request.
 
 const MAX_FILES = 5;
 const MAX_FILE_BYTES = 15 * 1024 * 1024;
@@ -51,8 +54,21 @@ export async function POST(request: Request) {
     if (!text.trim()) {
       return NextResponse.json({ error: "無法從檔案中讀出任何文字，請確認檔案內容清晰可讀。" }, { status: 502 });
     }
-    const fields = parseTenderFields(text);
-    return NextResponse.json({ fields, ocrPageCount });
+
+    let fields;
+    let method: "llm" | "regex" = "regex";
+    try {
+      const llmFields = await extractFieldsWithLLM(text);
+      if (llmFields) {
+        fields = llmFields;
+        method = "llm";
+      }
+    } catch (err) {
+      console.error("LLM field extraction failed, falling back to regex:", err);
+    }
+    if (!fields) fields = parseTenderFields(text);
+
+    return NextResponse.json({ fields, ocrPageCount, method });
   } catch (err) {
     console.error(err);
     // Surfaces the actual thrown error (not just a generic message) directly in the alert the user

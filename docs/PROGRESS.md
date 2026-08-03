@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-08-03 — 招標文件自動判讀 now prefers the local LLM, falls back to regex automatically
+
+- [x] New `extractFieldsWithLLM` sends OCR'd tender text to the same self-hosted `qwen2.5:14b` powering
+      系統助理, asking for structured JSON covering all 15 fields (same ROC-date/億萬-money conversion rules
+      as the regex version, spelled out in the prompt instead of regex). `extract-tender/route.ts` tries this
+      first and falls back to the existing keyword/regex parser on any failure — a down local model can never
+      make the feature worse than it already was. Response now reports which method actually ran, shown in
+      `InfoPanel`'s success message. See `DECISIONS.md` #42.
+- [x] Verified directly against a realistic synthetic tender document: 15/15 fields extracted correctly,
+      including ROC-date and 億/萬-money conversion — meaningfully more accurate than the regex baseline is
+      documented to achieve on non-standard layouts.
+
 ## 2026-08-03 — 系統助理 chat UX fixes: IME composition, quick-question chips, markdown bold
 
 - [x] Fixed a real bug: pressing Enter to confirm a Chinese IME composition was also triggering message
