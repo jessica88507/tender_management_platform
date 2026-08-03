@@ -801,3 +801,32 @@ code) against a realistic synthetic 政府電子採購網 tender announcement co
 dates ("114年06月10日"), a 億+萬 mixed amount ("新台幣18億5,000萬元"), and a time-of-day deadline. Got all 15
 fields back correct on the first pass except `buildingType` (null); after adding the floorCount fallback,
 re-ran and got all 15/15 fields correct.
+
+## 43. `caseDaysLeft` gave a different answer server-side than client-side — a real timezone bug, not the prompt
+
+**Context**: User reported 系統助理 saying "19 天" while the UI said "尚餘 18 天" for the same case. The first
+fix (#41's follow-up, telling the model today's date and forbidding recomputation) didn't actually address the
+root cause — the user retested and got the identical wrong answer, which was the tell that this wasn't a
+prompt-following problem at all. The app is deliberately timezone-naive throughout (`CLAUDE.md`: "this app is
+timezone-naive throughout by design" — `cases.deadline` is stored as a bare `text` column, "YYYY-MM-DDTHH:MM",
+with no timezone marker), which is only safe as long as every place that parses it runs in the same timezone.
+That held for the entire lifetime of this app because every consumer of `caseDaysLeft` (`derived.ts`) ran
+client-side, in the user's own Taiwan-timezone browser — `new Date("2026-08-22T17:00")` with no offset resolves
+to *local time of whatever JS engine parses it*, which was always Taiwan (UTC+8) local time by construction.
+`系統助理`'s new `/api/assistant/chat/route.ts` (#41) was the **first thing in this codebase to call
+`caseDaysLeft` server-side** — on Vercel, whose serverless functions run in UTC. The exact same deadline string
+now resolved to a real moment 8 hours earlier than the browser's interpretation, which is enough to shift the
+`Math.ceil()` day count by one in many cases — a genuine, silent client/server disagreement, not an LLM
+arithmetic mistake.
+**Decision**: Fixed at the source (`derived.ts`'s `caseDaysLeft`), not just in the assistant's prompt/route —
+added a `toTaiwanTime()` helper that appends an explicit `+08:00` offset before parsing the naive deadline
+string, making the parse resolve to the same real moment regardless of which timezone the *code* happens to be
+executing in. This fixes the bug at its only call site that mattered here, and also makes the UI's own
+"尚餘 N 天" robust against a much rarer edge case (someone viewing the site from a non-Taiwan-timezone browser,
+e.g. while traveling) as a side effect — without touching `urgentTasks`'s or `resolveLinkedTaskDates`'s own
+naive date parsing, since neither of those is (yet) called from server-side code, so they're not exposed to
+this class of bug the way `caseDaysLeft` now is.
+**Verification**: `npx tsc --noEmit` / `npx eslint` clean. Directly tested `caseDaysLeft` against the same fake
+case under `TZ=UTC`, `TZ=Asia/Taipei`, and `TZ=America/New_York` (Node respects `process.env.TZ` for `Date`'s
+local-time interpretation) — all three returned the identical day count after the fix, confirming it's now
+genuinely timezone-independent rather than accidentally-correct-in-one-timezone.

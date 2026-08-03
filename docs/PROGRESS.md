@@ -5,12 +5,17 @@
 
 ---
 
-## 2026-08-04 — Assistant day-count mismatch; clearer timeout diagnostics for tender upload
+## 2026-08-04 — Assistant day-count mismatch was a real server/client timezone bug, not a prompt issue
 
-- [x] Fixed the assistant reporting a different "剩餘天數" than the UI (e.g. 19 vs the correct 18) — it had no
-      anchor for "today" and sometimes recomputed the day count itself from the raw deadline instead of
-      trusting the already-correct number in its context. System prompt now states today's actual date and
-      explicitly forbids recomputing given day counts.
+- [x] The prompt-level fix (telling the model today's date) didn't actually fix it — user retested and got the
+      same wrong answer, which revealed the real cause: `caseDaysLeft` (`derived.ts`) parses the naive
+      "YYYY-MM-DDTHH:MM" deadline string with no timezone marker, which resolves to local time of whichever
+      timezone the *code* runs in. Every previous caller ran client-side in the user's Taiwan browser, so this
+      was silently always correct — until 系統助理's new API route became the first thing to call it
+      server-side, on Vercel's UTC servers, where the same string resolves to a real moment 8 hours earlier.
+      Fixed by anchoring the parse to an explicit `+08:00` offset. Verified timezone-independent by forcing
+      `TZ=UTC`/`TZ=Asia/Taipei`/`TZ=America/New_York` and confirming all three now agree. See `DECISIONS.md`
+      #43.
 - [x] `InfoPanel`'s upload handler now distinguishes "server responded but with an error" from "server response
       wasn't even valid JSON" (the latter only happens when something — most likely Vercel's own platform
       timeout — kills the request before our route's own error handling runs) and surfaces the HTTP status in

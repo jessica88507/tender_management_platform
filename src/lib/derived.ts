@@ -1,8 +1,19 @@
 import { Case, Task } from "./types";
 import { addDays, daysBetween, snapToBizDay, toISO } from "./date";
 
+// c.deadline is a naive "YYYY-MM-DDTHH:MM" string with no timezone marker. `new Date(str)` on a
+// string like that resolves to local time of wherever the JS engine happens to be running — which
+// is silently correct when this code runs in the user's own browser (already Taiwan time), but
+// wrong when the exact same function runs server-side (e.g. the 系統助理 API route, on Vercel's
+// UTC servers): the same deadline string resolves to a different real moment depending on which
+// side computed it, which is exactly what caused the assistant's day count to disagree with the
+// UI's. Anchoring explicitly to +08:00 makes this identical everywhere, not just in the browser.
+function toTaiwanTime(naiveDatetime: string): Date {
+  return new Date(`${naiveDatetime}:00+08:00`);
+}
+
 export function caseDaysLeft(c: Case): number {
-  return daysBetween(new Date(), new Date(c.deadline));
+  return daysBetween(new Date(), toTaiwanTime(c.deadline));
 }
 
 // 招標公告／投標截止 (milestone "collect"/"deadline") are calendar-only markers, not checkable
